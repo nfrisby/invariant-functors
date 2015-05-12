@@ -91,7 +91,7 @@ instance Invariant2 Const where invmap2 f _ _ _ (Const x) = Const (f x)
 instance Arrow arr => Invariant2 (WrappedArrow arr) where
   invmap2 _ f' g _ (WrapArrow x) = WrapArrow $ arr g Cat.. x Cat.. arr f'
 
-
+-- | @Data.Monoid@
 instance Invariant Endo where
   invmap f g (Endo x) = Endo (f . x . g)
 
