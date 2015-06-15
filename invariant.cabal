@@ -17,6 +17,7 @@ cabal-version: >= 1.6
 
 library
   build-depends: base >= 4 && < 5
-  build-depends: contravariant >= 0.1.2 && < 2.0
+  build-depends: contravariant >= 0.1.2 && < 2
 
   exposed-modules: Data.Functor.Invariant
+
