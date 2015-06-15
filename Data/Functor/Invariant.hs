@@ -12,7 +12,7 @@ import Control.Monad.ST (ST)
 
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Compose
-import Data.Monoid (Endo(Endo))
+import Data.Monoid (Dual(Dual), Endo(Endo))
 
 
 
@@ -92,9 +92,11 @@ instance Arrow arr => Invariant2 (WrappedArrow arr) where
   invmap2 _ f' g _ (WrapArrow x) = WrapArrow $ arr g Cat.. x Cat.. arr f'
 
 -- | @Data.Monoid@
+instance Invariant Dual where invmap f _ (Dual x) = Dual (f x)
+
+-- | @Data.Monoid@
 instance Invariant Endo where
   invmap f g (Endo x) = Endo (f . x . g)
-
 
 -- | from the @contravariant@ package
 instance Invariant Predicate where invmap = const contramap
