@@ -1,24 +1,35 @@
-module Tests where
+module InvariantSpec (main, spec) where
 
 import Data.Functor.Invariant
-import Distribution.TestSuite.QuickCheck
+import Test.Hspec
+import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck
 import Test.QuickCheck.Function
+
+main :: IO ()
+main = hspec spec
 
 data Proxy a = Proxy
 
 -----
 
 -- These test could probably be simplified by appealing to parametricity.
-tests :: IO [Test]
-tests = return
-  [ testProperty "composition1" $ prop  (Proxy :: Proxy Integer) (Proxy :: Proxy Bool) (Proxy :: Proxy [Bool])
-  , testProperty "composition2" $ prop2 (Proxy :: Proxy Integer) (Proxy :: Proxy Bool) (Proxy :: Proxy Integer) (Proxy :: Proxy Bool) (Proxy :: Proxy (Bool,Bool))
-  ]
+spec :: Spec
+spec = do
+  describe "Invariant"  . prop "satisfies the composition law" $
+    composition1 (Proxy :: Proxy Integer)
+                 (Proxy :: Proxy Bool)
+                 (Proxy :: Proxy [Bool])
+  describe "Invariant2" . prop "satisfies the composition law" $
+    composition2 (Proxy :: Proxy Integer)
+                 (Proxy :: Proxy Bool)
+                 (Proxy :: Proxy Integer)
+                 (Proxy :: Proxy Bool)
+                 (Proxy :: Proxy (Bool,Bool))
 
 -----
 
-prop ::
+composition1 ::
      ( Eq (f c), Invariant f
      , Show a, Show b, Show c
      , Show (f a), Show (f c)
@@ -28,7 +39,7 @@ prop ::
   -> Fun a b -> Fun b a
   -> f a
   -> Property
-prop
+composition1
   _ _ _
   (Fun _ f) (Fun _ f')
   (Fun _ g) (Fun _ g')
@@ -36,7 +47,7 @@ prop
       (invmap f f' . invmap g g') x
   === invmap (f . g) (g' . f') x
 
-prop2 ::
+composition2 ::
      ( Eq (f c1 c2), Invariant2 f
      , Show a1, Show b1, Show c1
      , Show a2, Show b2, Show c2
@@ -47,7 +58,7 @@ prop2 ::
   -> Fun a1 b1 -> Fun b1 a1 -> Fun a2 b2 -> Fun b2 a2
   -> f a1 a2
   -> Property
-prop2
+composition2
   _ _ _ _ _
   (Fun _ f1) (Fun _ f1') (Fun _ f2) (Fun _ f2')
   (Fun _ g1) (Fun _ g1') (Fun _ g2) (Fun _ g2')
