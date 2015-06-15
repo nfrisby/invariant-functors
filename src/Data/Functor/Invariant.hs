@@ -1,3 +1,15 @@
+{-|
+Module:      Data.Functor.Invariant
+License:     BSD-style (see the file LICENSE)
+Maintainer:  Ryan Scott
+Portability: Portable
+
+Haskell98 invariant functors (also known as exponential functors).
+
+For more information, see Edward Kmett's article \"Rotten Bananas\":
+
+<http://comonad.com/reader/2008/rotten-bananas/>
+-}
 module Data.Functor.Invariant (Invariant(..), Invariant2(..)) where
 
 import Text.ParserCombinators.ReadP (ReadP)
@@ -17,7 +29,7 @@ import Data.Monoid (Dual(Dual), Endo(Endo))
 
 
 
--- | Any @*->*@ type parametric in the argument permits an instance of
+-- | Any @* -> *@ type parametric in the argument permits an instance of
 -- @Invariant@.
 --
 -- Instances should satisfy the following laws:
@@ -31,7 +43,7 @@ class Invariant f where
 
 
 
--- | Any @*->*->*@ type parametric in both arguments permits an instance of
+-- | Any @* -> * -> *@ type parametric in both arguments permits an instance of
 -- @Invariant2@.
 --
 -- Instances should satisfy the following laws:
