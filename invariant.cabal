@@ -12,6 +12,7 @@ maintainer: Nicolas Frisby <nicolas.frisby@gmail.com>, Ryan Scott <ryan.gl.scott
 
 build-type: Simple
 cabal-version:  >= 1.9.2
+extra-source-files: CHANGELOG.md, README.md
 
 source-repository head
   type:     git
@@ -22,6 +23,7 @@ library
       base >= 4 && < 5
     , contravariant >= 0.1.2 && < 2
   exposed-modules: Data.Functor.Invariant
+  ghc-options: -Wall
 
 test-suite qc-tests
   type: exitcode-stdio-1.0
@@ -32,3 +34,4 @@ test-suite qc-tests
     , hspec >= 1.8
     , invariant
     , QuickCheck >= 2 && < 3
+  ghc-options: -Wall

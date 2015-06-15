@@ -29,11 +29,8 @@ spec = do
 
 -----
 
-composition1 ::
-     ( Eq (f c), Invariant f
-     , Show a, Show b, Show c
-     , Show (f a), Show (f c)
-     )
+composition1
+  :: (Eq (f c), Show (f c), Invariant f)
   => proxy b -> proxy c -> proxy (f a)
   -> Fun b c -> Fun c b
   -> Fun a b -> Fun b a
@@ -47,12 +44,8 @@ composition1
       (invmap f f' . invmap g g') x
   === invmap (f . g) (g' . f') x
 
-composition2 ::
-     ( Eq (f c1 c2), Invariant2 f
-     , Show a1, Show b1, Show c1
-     , Show a2, Show b2, Show c2
-     , Show (f a1 a2), Show (f c1 c2)
-     )
+composition2
+  :: (Eq (f c1 c2), Show (f c1 c2), Invariant2 f)
   => proxy b1 -> proxy c1 -> proxy b2 -> proxy c2 -> proxy (f a1 a2)
   -> Fun b1 c1 -> Fun c1 b1 -> Fun b2 c2 -> Fun c2 b2
   -> Fun a1 b1 -> Fun b1 a1 -> Fun a2 b2 -> Fun b2 a2
