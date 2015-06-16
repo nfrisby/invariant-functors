@@ -159,7 +159,7 @@ instance (Invariant f, Invariant g) => Invariant (ComposeFC f g) where
 instance Invariant f => Invariant (Star f a) where
   invmap = invmap2 id id
 -- | from the @profunctors@ package
-instance Invariant f => Invariant (Costar f a) where
+instance Invariant (Costar f a) where
   invmap = invmapFunctor
 -- | from the @profunctors@ package
 instance Arrow arr => Invariant (Pro.WrappedArrow arr a) where
