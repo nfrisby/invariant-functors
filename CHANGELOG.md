@@ -1,3 +1,6 @@
+# next
+* Support deriving `Invariant` and `Invariant2` instances with Template Haskell
+
 # 0.1.2
 * Add `Invariant` instances for `Dual` and `Endo`
 
