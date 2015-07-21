@@ -1,5 +1,6 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TemplateHaskell #-}
+
 {-|
 Module:      Data.Functor.Invariant.TH
 Copyright:   (C) 2012-2015 Nicolas Frisby, (C) 2015 Ryan Scott
@@ -21,20 +22,14 @@ module Data.Functor.Invariant.TH (
     , makeInvmap2
     ) where
 
-import           Data.Function (on)
-import           Data.Functor.Invariant (Invariant(..), Invariant2(..))
-import           Data.List (foldl', transpose)
-#if MIN_VERSION_template_haskell(2,7,0)
-import           Data.List (find)
-#endif
-import qualified Data.Map as Map (fromList, lookup)
-import           Data.Map (Map)
-import           Data.Maybe (fromMaybe)
+import           Data.Functor.Invariant.TH.Internal
+import           Data.List
+#if __GLASGOW_HASKELL__ < 710 && MIN_VERSION_template_haskell(2,8,0)
 import qualified Data.Set as Set
-import           Data.Set (Set)
+#endif
 
 import           Language.Haskell.TH.Lib
-import           Language.Haskell.TH.Ppr hiding (appPrec)
+import           Language.Haskell.TH.Ppr
 import           Language.Haskell.TH.Syntax
 
 -------------------------------------------------------------------------------
@@ -44,13 +39,13 @@ import           Language.Haskell.TH.Syntax
 {- $deriveInvariant
 
 'deriveInvariant' automatically generates an 'Invariant' instance declaration for a
-data type, a newtype, or a data family instance that has at least one type variable.
+data type, newtype, or data family instance that has at least one type variable.
 This emulates what would (hypothetically) happen if you could attach a @deriving
 'Invariant'@ clause to the end of a data declaration. Examples:
 
 @
 &#123;-&#35; LANGUAGE TemplateHaskell &#35;-&#125;
-import Data.Functor.Invariant.TH (deriveInvariant)
+import Data.Functor.Invariant.TH
 
 data Pair a = Pair a a
 $('deriveInvariant' ''Pair) -- instance Invariant Pair where ...
@@ -67,7 +62,7 @@ code may require the @-XFlexibleInstances@ extension. Some examples:
 
 @
 &#123;-&#35; LANGUAGE FlexibleInstances, TemplateHaskell, TypeFamilies &#35;-&#125;
-import Data.Functor.Invariant.TH (deriveInvariant)
+import Data.Functor.Invariant.TH
 
 class AssocClass a b where
     data AssocData a b
@@ -118,7 +113,7 @@ Note that there are some limitations:
   @
   data family Foo a b c
   data instance Foo Int y z = Foo Int y z
-  $(deriveInvariant 'Foo)
+  $('deriveInvariant' 'Foo)
   @
 
   To avoid this issue, it is recommened that you use the same type variables in the
@@ -127,7 +122,7 @@ Note that there are some limitations:
   @
   data family Foo a b c
   data instance Foo Int b c = Foo Int b c
-  $(deriveInvariant 'Foo)
+  $('deriveInvariant' 'Foo)
   @
 
 -}
@@ -140,13 +135,13 @@ deriveInvariant = deriveInvariantClass Invariant
 {- $deriveInvariant2
 
 'deriveInvariant2' automatically generates an 'Invariant2' instance declaration for
-a data type, a newtype, or a data family instance that has at least two type variables.
+a data type, newtype, or data family instance that has at least two type variables.
 This emulates what would (hypothetically) happen if you could attach a @deriving
 'Invariant2'@ clause to the end of a data declaration. Examples:
 
 @
 &#123;-&#35; LANGUAGE TemplateHaskell &#35;-&#125;
-import Data.Functor.Invariant.TH (deriveInvariant2)
+import Data.Functor.Invariant.TH
 
 data OneOrNone a b = OneL a | OneR b | None
 $('deriveInvariant2' ''OneOrNone) -- instance Invariant2 OneOrNone where ...
@@ -200,21 +195,11 @@ data family instance without having to make the type an instance of 'Invariant'.
 these cases, this module provides several functions (all prefixed with @make-@) that
 splice the appropriate lambda expression into your source code. Example:
 
-@
-&#123;-&#35; LANGUAGE TemplateHaskell &#35;-&#125;
-import Data.Functor.Invariant.TH (makeInvmap)
-
-newtype Identity a = Identity a
-
-mapIdentity :: (a -> b) -> Identity a -> Identity b
-mapIdentity f = $(makeInvmap ''Identity) f undefined
-@
-
-@make-@ functions are also useful for creating 'Invariant' instances for data types
-with sophisticated type parameters. For example, 'deriveInvariant' cannot infer the
-correct type context for @newtype HigherKinded f a b c = HigherKinded (f a b c)@,
-since @f@ is of kind @* -> * -> * -> *@. However, it is still possible to create an
-'Invariant' instance for @HigherKinded@ without too much trouble using 'makeInvmap':
+This is particularly useful for creating instances for sophisticated data types. For
+example, 'deriveInvariant' cannot infer the correct type context for @newtype
+HigherKinded f a b c = HigherKinded (f a b c)@, since @f@ is of kind
+@* -> * -> * -> *@. However, it is still possible to create an 'Invariant' instance
+for @HigherKinded@ without too much trouble using 'makeInvmap':
 
 @
 &#123;-&#35; LANGUAGE FlexibleContexts, TemplateHaskell &#35;-&#125;
@@ -314,7 +299,7 @@ invmapDecs nbs cons =
     ]
   where
     classFuncName :: Name
-    classFuncName  = invmapNameTable . toEnum $ length nbs
+    classFuncName = invmapNameTable . toEnum $ length nbs
 
 -- | Generates a lambda expression which behaves like invmap (for Invariant),
 -- or invmap2 (for Invariant2).
@@ -323,11 +308,11 @@ makeInvmapClass iClass tyConName = do
     info <- reify tyConName
     case info of
         TyConI{} -> withTyCon tyConName $ \ctxt tvbs decs ->
-            let nbs = thd3 $ cxtAndTypePlainTy iClass tyConName ctxt tvbs
+            let !nbs = thd3 $ cxtAndTypePlainTy iClass tyConName ctxt tvbs
              in makeInvmapForCons nbs decs
 #if MIN_VERSION_template_haskell(2,7,0)
         DataConI{} -> withDataFamInstCon tyConName $ \famTvbs ctxt parentName instTys cons ->
-            let nbs = thd3 $ cxtAndTypeDataFamInstCon iClass parentName ctxt famTvbs instTys
+            let !nbs = thd3 $ cxtAndTypeDataFamInstCon iClass parentName ctxt famTvbs instTys
              in makeInvmapForCons nbs cons
         FamilyI (FamilyD DataFam _ _ _) _ ->
             error $ ns ++ "Cannot use a data family name. Use a data family instance constructor instead."
@@ -359,7 +344,7 @@ makeInvmapForCons nbs cons = do
         . appsE
         $ [ varE $ invmapConstNameTable iClass
           , if null cons
-               then appE (varE 'error)
+               then appE (varE errorValName)
                          (stringE $ "Void " ++ nameBase (invmapNameTable iClass))
                else caseE (varE value)
                           (map (makeInvmapForCon iClass tvis) cons)
@@ -381,7 +366,7 @@ makeInvmapForCon iClass tvis (InfixC (_, argTyL) conName (_, argTyR)) = do
     makeInvmapForArgs iClass tvis conName [argTyL, argTyR] [argL, argR]
 makeInvmapForCon iClass tvis (ForallC tvbs faCxt con) =
     if any (`predMentionsNameBase` map fst3 tvis) faCxt
-       then existentialContextError . nameBase $ constructorName con
+       then existentialContextError $ constructorName con
        else makeInvmapForCon iClass (removeForalled tvbs tvis) con
 
 makeInvmapForArgs :: InvariantClass
@@ -392,14 +377,14 @@ makeInvmapForArgs :: InvariantClass
                   ->  Q Match
 makeInvmapForArgs iClass tvis conName tys args =
     let mappedArgs :: [Q Exp]
-        mappedArgs = zipWith (makeInvmapForArg iClass (nameBase conName) tvis) tys args
+        mappedArgs = zipWith (makeInvmapForArg iClass conName tvis) tys args
      in match (conP conName $ map varP args)
               (normalB . appsE $ conE conName:mappedArgs)
               []
 
 -- | Generates a lambda expression for invmap(2) for an argument of a constructor.
 makeInvmapForArg :: InvariantClass
-                 -> String
+                 -> Name
                  -> [TyVarInfo]
                  -> Type
                  -> Name
@@ -411,7 +396,7 @@ makeInvmapForArg iClass conName tvis ty tyExpName = do
 -- | Generates a lambda expression for invmap(2) for an argument of a
 -- constructor, after expanding all type synonyms.
 makeInvmapForArg' :: InvariantClass
-                  -> String
+                  -> Name
                   -> [TyVarInfo]
                   -> Type
                   -> Name
@@ -422,7 +407,7 @@ makeInvmapForArg' iClass conName tvis ty tyExpName =
 -- | Generates a lambda expression for invmap(2) for a specific type.
 -- The generated expression depends on the number of type variables.
 makeInvmapForType :: InvariantClass
-                  -> String
+                  -> Name
                   -> [TyVarInfo]
                   -> Bool
                   -> Type
@@ -431,7 +416,9 @@ makeInvmapForType _ _ tvis covariant (VarT tyName) =
     case lookup2 (NameBase tyName) tvis of
          Just (covMap, contraMap) ->
              varE $ if covariant then covMap else contraMap
-         Nothing -> [| \x -> x |] -- Produce a lambda expression rather than id, addressing Trac #7436
+         Nothing -> do -- Produce a lambda expression rather than id, addressing Trac #7436
+             x <- newName "x"
+             lamE [varP x] $ varE x
 makeInvmapForType iClass conName tvis covariant (SigT ty _) =
     makeInvmapForType iClass conName tvis covariant ty
 makeInvmapForType iClass conName tvis covariant (ForallT tvbs _ ty)
@@ -464,10 +451,11 @@ makeInvmapForType iClass conName tvis covariant ty =
      in case tyCon of
              ArrowT | mentionsTyArgs ->
                  let [argTy, resTy] = tyArgs
-                  in [| \x b ->
-                         $(makeInvmapForType iClass conName tvis covariant resTy)
-                         (x ($(makeInvmapForType iClass conName tvis (not covariant) argTy) b))
-                      |]
+                  in do x <- newName "x"
+                        b <- newName "b"
+                        lamE [varP x, varP b] $
+                          makeInvmapForType iClass conName tvis covariant resTy `appE` (varE x `appE`
+                            (makeInvmapForType iClass conName tvis (not covariant) argTy `appE` varE b))
              TupleT n | n > 0 && mentionsTyArgs -> do
                  x  <- newName "x"
                  xs <- newNameList "x" n
@@ -485,7 +473,8 @@ makeInvmapForType iClass conName tvis covariant ty =
                                 ( varE (invmapNameTable (toEnum numLastArgs))
                                 : doubleMap (makeInvmapForType iClass conName tvis) rhsArgs
                                 )
-                           else [| \x -> x |] -- See Trac #7436
+                           else do x <- newName "x"
+                                   lamE [varP x] $ varE x
 
 -------------------------------------------------------------------------------
 -- Template Haskell reifying and AST manipulation
@@ -565,7 +554,7 @@ cxtAndTypePlainTy iClass tyConName dataCxt tvbs =
     if remainingLength < 0 || not (wellKinded droppedKinds) -- If we have enough well-kinded type variables
        then derivingKindError iClass tyConName
     else if any (`predMentionsNameBase` droppedNbs) dataCxt -- If the last type variable(s) are mentioned in a datatype context
-       then datatypeContextError iClass instanceType
+       then datatypeContextError tyConName instanceType
     else (instanceCxt, instanceType, droppedNbs)
   where
     instanceCxt :: Cxt
@@ -600,7 +589,7 @@ cxtAndTypeDataFamInstCon iClass parentName dataCxt famTvbs instTysAndKinds =
     if remainingLength < 0 || not (wellKinded droppedKinds) -- If we have enough well-kinded type variables
        then derivingKindError iClass parentName
     else if any (`predMentionsNameBase` droppedNbs) dataCxt -- If the last type variable(s) are mentioned in a datatype context
-       then datatypeContextError iClass instanceType
+       then datatypeContextError parentName instanceType
     else if canEtaReduce remaining dropped -- If it is safe to drop the type variables
        then (instanceCxt, instanceType, droppedNbs)
     else etaReductionError instanceType
@@ -744,48 +733,45 @@ derivingKindError iClass tyConName = error
     className :: String
     className = nameBase $ invariantClassNameTable iClass
 
+-- | The data type has a DatatypeContext which mentions one of the eta-reduced
+-- type variables.
+datatypeContextError :: Name -> Type -> a
+datatypeContextError dataName instanceType = error
+    . showString "Can't make a derived instance of ‘"
+    . showString (pprint instanceType)
+    . showString "‘:\n\tData type ‘"
+    . showString (nameBase dataName)
+    . showString "‘ must not have a class context involving the last type argument(s)"
+    $ ""
+
+-- | The data type has an existential constraint which mentions one of the
+-- eta-reduced type variables.
+existentialContextError :: Name -> a
+existentialContextError conName = error
+    . showString "Constructor ‘"
+    . showString (nameBase conName)
+    . showString "‘ must be truly polymorphic in the last argument(s) of the data type"
+    $ ""
+
+-- | The data type mentions one of the n eta-reduced type variables in a place other
+-- than the last nth positions of a data type in a constructor's field.
+outOfPlaceTyVarError :: Name -> [NameBase] -> a
+outOfPlaceTyVarError conName tyVarNames = error
+    . showString "Constructor ‘"
+    . showString (nameBase conName)
+    . showString "‘ must use the type variable(s) "
+    . showsPrec 0 tyVarNames
+    . showString " only in the last argument(s) of a data type"
+    $ ""
+
+#if MIN_VERSION_template_haskell(2,7,0)
 -- | One of the last type variables cannot be eta-reduced (see the canEtaReduce
 -- function for the criteria it would have to meet).
 etaReductionError :: Type -> a
 etaReductionError instanceType = error $
     "Cannot eta-reduce to an instance of form \n\tinstance (...) => "
     ++ pprint instanceType
-
--- | The data type has a DatatypeContext which mentions one of the eta-reduced
--- type variables.
-datatypeContextError :: InvariantClass -> Type -> a
-datatypeContextError iClass instanceType = error
-    . showString "Can't make a derived instance of ‘"
-    . showString (pprint instanceType)
-    . showString "‘:\n\tData type ‘"
-    . showString className
-    . showString "‘ must not have a class context involving the last type argument(s)"
-    $ ""
-  where
-    className :: String
-    className = nameBase $ invariantClassNameTable iClass
-
--- | The data type has an existential constraint which mentions one of the
--- eta-reduced type variables.
-existentialContextError :: String -> a
-existentialContextError conName = error
-    . showString "Constructor ‘"
-    . showString conName
-    . showString "‘ must be truly polymorphic in the last argument(s) of the data type"
-    $ ""
-
--- | The data type mentions one of the n eta-reduced type variables in a place other
--- than the last nth positions of a data type in a constructor's field.
-outOfPlaceTyVarError :: String -> [NameBase] -> a
-outOfPlaceTyVarError conName tyVarNames = error
-    . showString "Constructor ‘"
-    . showString conName
-    . showString "‘ must use the type variable(s) "
-    . showsPrec 0 tyVarNames
-    . showString " only in the last argument(s) of a data type"
-    $ ""
-
-#if !(MIN_VERSION_template_haskell(2,7,0))
+#else
 -- | Template Haskell didn't list all of a data family's instances upon reification
 -- until template-haskell-2.7.0.0, which is necessary for a derived Invariant instance
 -- to work.
@@ -795,373 +781,4 @@ dataConIError = error
     . showString "\n\t(Note: if you are trying to derive Invariant for a type family,"
     . showString "\n\tuse GHC >= 7.4 instead.)"
     $ ""
-#endif
-
--------------------------------------------------------------------------------
--- Expanding type synonyms
--------------------------------------------------------------------------------
-
--- | Expands all type synonyms in a type. Written by Dan Rosén in the
--- @genifunctors@ package (licensed under BSD3).
-expandSyn :: Type -> Q Type
-expandSyn (ForallT tvs ctx t) = fmap (ForallT tvs ctx) $ expandSyn t
-expandSyn t@AppT{}            = expandSynApp t []
-expandSyn t@ConT{}            = expandSynApp t []
-expandSyn (SigT t _)          = expandSyn t   -- Ignore kind synonyms
-expandSyn t                   = return t
-
-expandSynApp :: Type -> [Type] -> Q Type
-expandSynApp (AppT t1 t2) ts = do
-    t2' <- expandSyn t2
-    expandSynApp t1 (t2':ts)
-expandSynApp (ConT n) ts | nameBase n == "[]" = return $ foldl' AppT ListT ts
-expandSynApp t@(ConT n) ts = do
-    info <- reify n
-    case info of
-        TyConI (TySynD _ tvs rhs) ->
-            let (ts', ts'') = splitAt (length tvs) ts
-                subs = mkSubst tvs ts'
-                rhs' = subst subs rhs
-             in expandSynApp rhs' ts''
-        _ -> return $ foldl' AppT t ts
-expandSynApp t ts = do
-    t' <- expandSyn t
-    return $ foldl' AppT t' ts
-
-type Subst = Map Name Type
-
-mkSubst :: [TyVarBndr] -> [Type] -> Subst
-mkSubst vs ts =
-   let vs' = map un vs
-       un (PlainTV v)    = v
-       un (KindedTV v _) = v
-   in Map.fromList $ zip vs' ts
-
-subst :: Subst -> Type -> Type
-subst subs (ForallT v c t) = ForallT v c $ subst subs t
-subst subs t@(VarT n)      = fromMaybe t $ Map.lookup n subs
-subst subs (AppT t1 t2)    = AppT (subst subs t1) (subst subs t2)
-subst subs (SigT t k)      = SigT (subst subs t) k
-subst _ t                  = t
-
--------------------------------------------------------------------------------
--- Class-specific constants
--------------------------------------------------------------------------------
-
--- | A representation of which @Invariant@ is being used.
-data InvariantClass = Invariant | Invariant2
-  deriving (Eq, Ord)
-
-instance Enum InvariantClass where
-    fromEnum Invariant  = 1
-    fromEnum Invariant2 = 2
-
-    toEnum 1 = Invariant
-    toEnum 2 = Invariant2
-    toEnum i = error $ "No Invariant class for number " ++ show i
-
-invmapConstNameTable :: InvariantClass -> Name
-invmapConstNameTable Invariant  = 'invmapConst
-invmapConstNameTable Invariant2 = 'invmap2Const
-
-invariantClassNameTable :: InvariantClass -> Name
-invariantClassNameTable Invariant  = ''Invariant
-invariantClassNameTable Invariant2 = ''Invariant2
-
-invmapNameTable :: InvariantClass -> Name
-invmapNameTable Invariant  = 'invmap
-invmapNameTable Invariant2 = 'invmap2
-
--- | A type-restricted version of 'const'. This constrains the map functions
--- that are autogenerated by Template Haskell to be the correct type, even
--- if they aren't actually used in an invmap(2) expression. This is useful
--- in makeInvmap(2), since a map function might have its type inferred as
--- @a@ instead of @a -> b@ (which is clearly wrong).
-invmapConst :: f b -> (a -> b) -> (b -> a) -> f a -> f b
-invmapConst = const . const . const
-{-# INLINE invmapConst #-}
-
-invmap2Const :: f c d
-             -> (a -> c) -> (c -> a)
-             -> (b -> d) -> (d -> b)
-             -> f a b -> f c d
-invmap2Const = const . const . const . const . const
-{-# INLINE invmap2Const #-}
-
--------------------------------------------------------------------------------
--- NameBase
--------------------------------------------------------------------------------
-
--- | A wrapper around Name which only uses the 'nameBase' (not the entire Name)
--- to compare for equality. For example, if you had two Names a_123 and a_456,
--- they are not equal as Names, but they are equal as NameBases.
---
--- This is useful when inspecting type variables, since a type variable in an
--- instance context may have a distinct Name from a type variable within an
--- actual constructor declaration, but we'd want to treat them as the same
--- if they have the same 'nameBase' (since that's what the programmer uses to
--- begin with).
-newtype NameBase = NameBase { getName :: Name }
-
-getNameBase :: NameBase -> String
-getNameBase = nameBase . getName
-
-instance Eq NameBase where
-    (==) = (==) `on` getNameBase
-
-instance Ord NameBase where
-    compare = compare `on` getNameBase
-
-instance Show NameBase where
-    showsPrec p = showsPrec p . getNameBase
-
--- | A NameBase paired with the name of its map functions. For example, when deriving
--- Invariant2, its list of TyVarInfos might look like [(a, 'covMap1, 'contraMap1),
--- (b, 'covMap2, 'contraMap2)].
-type TyVarInfo = (NameBase, Name, Name)
-
--------------------------------------------------------------------------------
--- Assorted utilities
--------------------------------------------------------------------------------
-
-fst3 :: (a, b, c) -> a
-fst3 (a, _, _) = a
-
-thd3 :: (a, b, c) -> c
-thd3 (_, _, c) = c
-
--- Like 'lookup', but for lists of triples.
-lookup2 :: Eq a => a -> [(a, b, c)] -> Maybe (b, c)
-lookup2 _ [] = Nothing
-lookup2 key ((x,y,z):xyzs)
-    | key == x  = Just (y, z)
-    | otherwise = lookup2 key xyzs
-
--- | Extracts the name of a constructor.
-constructorName :: Con -> Name
-constructorName (NormalC name      _  ) = name
-constructorName (RecC    name      _  ) = name
-constructorName (InfixC  _    name _  ) = name
-constructorName (ForallC _    _    con) = constructorName con
-
--- | Generate a list of fresh names with a common prefix, and numbered suffixes.
-newNameList :: String -> Int -> Q [Name]
-newNameList prefix n = mapM (newName . (prefix ++) . show) [1..n]
-
--- | Remove any occurrences of a forall-ed type variable from a list of @TyVarInfo@s.
-removeForalled :: [TyVarBndr] -> [TyVarInfo] -> [TyVarInfo]
-removeForalled tvbs = filter (not . foralled tvbs)
-  where
-    foralled :: [TyVarBndr] -> TyVarInfo -> Bool
-    foralled tvbs' tvi = fst3 tvi `elem` map (NameBase . tvbName) tvbs'
-
--- | Extracts the name from a TyVarBndr.
-tvbName :: TyVarBndr -> Name
-tvbName (PlainTV  name)   = name
-tvbName (KindedTV name _) = name
-
--- | Extracts the kind from a TyVarBndr.
-tvbKind :: TyVarBndr -> Kind
-tvbKind (PlainTV  _)   = starK
-tvbKind (KindedTV _ k) = k
-
--- | Replace the Name of a TyVarBndr with one from a Type (if the Type has a Name).
-replaceTyVarName :: TyVarBndr -> Type -> TyVarBndr
-replaceTyVarName tvb            (SigT t _) = replaceTyVarName tvb t
-replaceTyVarName (PlainTV  _)   (VarT n)   = PlainTV  n
-replaceTyVarName (KindedTV _ k) (VarT n)   = KindedTV n k
-replaceTyVarName tvb            _          = tvb
-
--- | Applies a typeclass constraint to a type.
-applyClass :: Name -> Name -> Pred
-#if MIN_VERSION_template_haskell(2,10,0)
-applyClass con t = AppT (ConT con) (VarT t)
-#else
-applyClass con t = ClassP con [VarT t]
-#endif
-
--- | Checks to see if the last types in a data family instance can be safely eta-
--- reduced (i.e., dropped), given the other types. This checks for three conditions:
---
--- (1) All of the dropped types are type variables
--- (2) All of the dropped types are distinct
--- (3) None of the remaining types mention any of the dropped types
-canEtaReduce :: [Type] -> [Type] -> Bool
-canEtaReduce remaining dropped =
-       all isTyVar dropped
-    && allDistinct nbs -- Make sure not to pass something of type [Type], since Type
-                       -- didn't have an Ord instance until template-haskell-2.10.0.0
-    && not (any (`mentionsNameBase` nbs) remaining)
-  where
-    nbs :: [NameBase]
-    nbs = map varTToNameBase dropped
-
--- | Extract the Name from a type variable.
-varTToName :: Type -> Name
-varTToName (VarT n)   = n
-varTToName (SigT t _) = varTToName t
-varTToName _          = error "Not a type variable!"
-
--- | Extract the NameBase from a type variable.
-varTToNameBase :: Type -> NameBase
-varTToNameBase = NameBase . varTToName
-
--- | Peel off a kind signature from a Type (if it has one).
-unSigT :: Type -> Type
-unSigT (SigT t _) = t
-unSigT t          = t
-
--- | Is the given type a variable?
-isTyVar :: Type -> Bool
-isTyVar (VarT _)   = True
-isTyVar (SigT t _) = isTyVar t
-isTyVar _          = False
-
--- | Is the given type a type family constructor (and not a data family constructor)?
-isTyFamily :: Type -> Q Bool
-isTyFamily (ConT n) = do
-    info <- reify n
-    return $ case info of
-#if MIN_VERSION_template_haskell(2,7,0)
-         FamilyI (FamilyD TypeFam _ _ _) _ -> True
-#else
-         TyConI  (FamilyD TypeFam _ _ _)   -> True
-#endif
-         _ -> False
-isTyFamily _ = return False
-
--- | Are all of the items in a list (which have an ordering) distinct?
---
--- This uses Set (as opposed to nub) for better asymptotic time complexity.
-allDistinct :: Ord a => [a] -> Bool
-allDistinct = allDistinct' Set.empty
-  where
-    allDistinct' :: Ord a => Set a -> [a] -> Bool
-    allDistinct' uniqs (x:xs)
-        | x `Set.member` uniqs = False
-        | otherwise            = allDistinct' (Set.insert x uniqs) xs
-    allDistinct' _ _           = True
-
--- | Does the given type mention any of the NameBases in the list?
-mentionsNameBase :: Type -> [NameBase] -> Bool
-mentionsNameBase = go Set.empty
-  where
-    go :: Set NameBase -> Type -> [NameBase] -> Bool
-    go foralls (ForallT tvbs _ t) nbs =
-        go (foralls `Set.union` Set.fromList (map (NameBase . tvbName) tvbs)) t nbs
-    go foralls (AppT t1 t2) nbs = go foralls t1 nbs || go foralls t2 nbs
-    go foralls (SigT t _)   nbs = go foralls t nbs
-    go foralls (VarT n)     nbs = varNb `elem` nbs && not (varNb `Set.member` foralls)
-      where
-        varNb = NameBase n
-    go _       _            _   = False
-
--- | Does an instance predicate mention any of the NameBases in the list?
-predMentionsNameBase :: Pred -> [NameBase] -> Bool
-#if MIN_VERSION_template_haskell(2,10,0)
-predMentionsNameBase = mentionsNameBase
-#else
-predMentionsNameBase (ClassP _ tys) nbs = any (`mentionsNameBase` nbs) tys
-predMentionsNameBase (EqualP t1 t2) nbs = mentionsNameBase t1 nbs || mentionsNameBase t2 nbs
-#endif
-
--- | The number of arrows that compose the spine of a kind signature
--- (e.g., (* -> *) -> k -> * has two arrows on its spine).
-numKindArrows :: Kind -> Int
-numKindArrows k = length (uncurryKind k) - 1
-
--- | Construct a type via curried application.
-applyTy :: Type -> [Type] -> Type
-applyTy = foldl' AppT
-
--- | Fully applies a type constructor to its type variables.
-applyTyCon :: Name -> [Type] -> Type
-applyTyCon = applyTy . ConT
-
--- | Split an applied type into its individual components. For example, this:
---
--- @
--- Either Int Char
--- @
---
--- would split to this:
---
--- @
--- [Either, Int, Char]
--- @
-unapplyTy :: Type -> [Type]
-unapplyTy = reverse . go
-  where
-    go :: Type -> [Type]
-    go (AppT t1 t2) = t2:go t1
-    go (SigT t _)   = go t
-    go t            = [t]
-
--- | Split a type signature by the arrows on its spine. For example, this:
---
--- @
--- (Int -> String) -> Char -> ()
--- @
---
--- would split to this:
---
--- @
--- [Int -> String, Char, ()]
--- @
-uncurryTy :: Type -> [Type]
-uncurryTy (AppT (AppT ArrowT t1) t2) = t1:uncurryTy t2
-uncurryTy (SigT t _)                 = uncurryTy t
-uncurryTy t                          = [t]
-
--- | Like uncurryType, except on a kind level.
-uncurryKind :: Kind -> [Kind]
-#if MIN_VERSION_template_haskell(2,8,0)
-uncurryKind = uncurryTy
-#else
-uncurryKind (ArrowK k1 k2) = k1:uncurryKind k2
-uncurryKind k              = [k]
-#endif
-
-wellKinded :: [Kind] -> Bool
-wellKinded = all canRealizeKindStar
-
--- | Of form k1 -> k2 -> ... -> kn, where k is either a single kind variable or *.
-canRealizeKindStarChain :: Kind -> Bool
-canRealizeKindStarChain = all canRealizeKindStar . uncurryKind
-
-canRealizeKindStar :: Kind -> Bool
-canRealizeKindStar k = case uncurryKind k of
-    [k'] -> case k' of
-#if MIN_VERSION_template_haskell(2,8,0)
-                 StarT    -> True
-                 (VarT _) -> True -- Kind k can be instantiated with *
-#else
-                 StarK    -> True
-#endif
-                 _ -> False
-    _ -> False
-
-createKindChain :: Int -> Kind
-createKindChain = go starK
-  where
-    go :: Kind -> Int -> Kind
-    go k 0 = k
-#if MIN_VERSION_template_haskell(2,8,0)
-    go k n = go (AppT (AppT ArrowT StarT) k) (n - 1)
-#else
-    go k n = go (ArrowK StarK k) (n - 1)
-#endif
-
-# if MIN_VERSION_template_haskell(2,8,0) && __GLASGOW_HASKELL__ < 710
-distinctKindVars :: Kind -> Set Name
-distinctKindVars (AppT k1 k2) = distinctKindVars k1 `Set.union` distinctKindVars k2
-distinctKindVars (SigT k _)   = distinctKindVars k
-distinctKindVars (VarT k)     = Set.singleton k
-distinctKindVars _            = Set.empty
-#endif
-
-#if __GLASGOW_HASKELL__ >= 708 && __GLASGOW_HASKELL__ < 710
-tvbToType :: TyVarBndr -> Type
-tvbToType (PlainTV n)    = VarT n
-tvbToType (KindedTV n k) = SigT (VarT n) k
 #endif
