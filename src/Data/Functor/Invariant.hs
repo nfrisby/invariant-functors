@@ -33,7 +33,7 @@ module Data.Functor.Invariant
 import qualified Control.Category as Cat
 import           Control.Arrow
 import           Control.Applicative as App
-import           Control.Exception (Handler)
+import           Control.Exception (Handler(..))
 import           Control.Monad (MonadPlus(..))
 import qualified Control.Monad.ST as Strict (ST)
 import qualified Control.Monad.ST.Lazy as Lazy (ST)
@@ -172,12 +172,18 @@ instance Arrow arr => Invariant (App.WrappedArrow arr a) where
   invmap f _ (App.WrapArrow x) = App.WrapArrow $ ((arr f) Cat.. x)
 
 -- | @Control.Arrow@
-instance Arrow a => Invariant (ArrowMonad a) where
+instance
+#if MIN_VERSION_base(4,4,0)
+  Arrow a
+#else
+  ArrowApply a
+#endif
+  => Invariant (ArrowMonad a) where
   invmap f _ (ArrowMonad m) = ArrowMonad $ m >>> arr f
 
 -- | @Control.Exception@
 instance Invariant Handler where
-  invmap = invmapFunctor
+  invmap f _ (Handler h) = Handler (fmap f . h)
 
 -- | @Data.Functor.Identity@
 instance Invariant Identity where
@@ -218,7 +224,11 @@ instance Invariant OptDescr where
   invmap f g (GetOpt.Option a b argDescr c) = GetOpt.Option a b (invmap f g argDescr) c
 
 -- | from the @array@ package
-instance Ix i => Invariant (Array i) where
+instance
+#if __GLASGOW_HASKELL__ < 711
+  Ix i
+#endif
+  => Invariant (Array i) where
   invmap = invmapFunctor
 
 -- | from the @bifunctors@ package
