@@ -1,5 +1,6 @@
 {-|
 Module:      Data.Functor.Invariant
+Copyright:   (C) 2012-2015 Nicolas Frisby, (C) 2015 Ryan Scott
 License:     BSD-style (see the file LICENSE)
 Maintainer:  Ryan Scott
 Portability: Portable
