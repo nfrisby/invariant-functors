@@ -113,19 +113,19 @@ instance Invariant ((,,,) a b c) where
 instance Invariant ((,,,,) a b c d) where
   invmap f _ ~(a, b, c, d, x) = (a, b, c, d, f x)
 
--- | @Control.Applicative@
+-- | from @Control.Applicative@
 instance Invariant (Const a) where invmap = invmapFunctor
--- | @Control.Applicative@
+-- | from @Control.Applicative@
 instance Invariant ZipList where invmap = invmapFunctor
--- | @Control.Applicative@
+-- | from @Control.Applicative@
 instance Monad m => Invariant (WrappedMonad m) where invmap = invmapFunctor
--- | @Control.Applicative@
+-- | from @Control.Applicative@
 instance Arrow arr => Invariant (App.WrappedArrow arr a) where
   invmap f _ (App.WrapArrow x) = App.WrapArrow $ ((arr f) Cat.. x)
 
--- | @Data.Monoid@
+-- | from @Data.Monoid@
 instance Invariant Dual where invmap f _ (Dual x) = Dual (f x)
--- | @Data.Monoid@
+-- | from @Data.Monoid@
 instance Invariant Endo where
   invmap f g (Endo x) = Endo (f . x . g)
 
@@ -297,9 +297,9 @@ instance Invariant2 ((,,,) a b) where
 instance Invariant2 ((,,,,) a b c) where
   invmap2 f _ g _ ~(a, b, c, x, y) = (a, b, c, f x, g y)
 
--- | @Control.Applicative@
+-- | from @Control.Applicative@
 instance Invariant2 Const where invmap2 = invmap2Bifunctor
--- | @Control.Applicative@
+-- | from @Control.Applicative@
 instance Arrow arr => Invariant2 (App.WrappedArrow arr) where
   invmap2 _ f' g _ (App.WrapArrow x) = App.WrapArrow $ arr g Cat.. x Cat.. arr f'
 
@@ -416,30 +416,30 @@ instance Closed p => Closed (WrappedProfunctor p) where
 
 
 
--- | @GHC.Generics@
+-- | from @GHC.Generics@
 instance Invariant V1 where
   -- NSF 25 July 2015: I'd prefer an -XEmptyCase, but Haskell98.
   invmap _ _ _ = error "Invariant V1"
--- | @GHC.Generics@
+-- | from @GHC.Generics@
 instance Invariant U1 where invmap _ _ _ = U1
--- | @GHC.Generics@
+-- | from @GHC.Generics@
 instance (Invariant l, Invariant r) => Invariant ((:+:) l r) where
   invmap f g (L1 l) = L1 $ invmap f g l
   invmap f g (R1 r) = R1 $ invmap f g r
--- | @GHC.Generics@
+-- | from @GHC.Generics@
 instance (Invariant l, Invariant r) => Invariant ((:*:) l r) where
   invmap f g ~(l :*: r) = invmap f g l :*: invmap f g r
--- | @GHC.Generics@
+-- | from @GHC.Generics@
 instance Invariant (K1 i c) where invmap _ _ (K1 c) = K1 c
--- | @GHC.Generics@
+-- | from @GHC.Generics@
 instance Invariant2 (K1 i) where invmap2 f _ _ _ (K1 c) = K1 $ f c
--- | @GHC.Generics@
+-- | from @GHC.Generics@
 instance Invariant f => Invariant (M1 i t f) where invmap f g (M1 fp) = M1 $ invmap f g fp
--- | @GHC.Generics@
+-- | from @GHC.Generics@
 instance Invariant Par1 where invmap f _ (Par1 c) = Par1 $ f c
--- | @GHC.Generics@
+-- | from @GHC.Generics@
 instance Invariant f => Invariant (Rec1 f) where invmap f g (Rec1 fp) = Rec1 $ invmap f g fp
--- | @GHC.Generics@; genuinely relying on this instance
+-- | from @GHC.Generics@; genuinely relying on this instance
 -- likely requires writing your 'Generic1' instance by hand
 instance (Invariant f, Invariant g) => Invariant ((:.:) f g) where
   invmap f g (Comp1 fgp) = Comp1 $ invmap (invmap f g) (invmap g f) fgp
