@@ -45,7 +45,9 @@ import           Control.Monad (MonadPlus(..))
 import qualified Control.Monad.ST as Strict (ST)
 import qualified Control.Monad.ST.Lazy as Lazy (ST)
 import           Data.Functor.Identity (Identity)
+#if __GLASGOW_HASKELL__ < 711
 import           Data.Ix (Ix)
+#endif
 import qualified Data.Monoid as Monoid (First(..), Last(..))
 #if MIN_VERSION_base(4,8,0)
 import           Data.Monoid (Alt(..))

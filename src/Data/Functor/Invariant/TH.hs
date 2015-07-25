@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 
 {-|
@@ -310,12 +309,12 @@ makeInvmapClass iClass tyConName = do
     info <- reify tyConName
     case info of
         TyConI{} -> withTyCon tyConName $ \ctxt tvbs decs ->
-            let !nbs = thd3 $ cxtAndTypePlainTy iClass tyConName ctxt tvbs
-             in makeInvmapForCons nbs decs
+            let nbs = thd3 $ cxtAndTypePlainTy iClass tyConName ctxt tvbs
+             in nbs `seq` makeInvmapForCons nbs decs
 #if MIN_VERSION_template_haskell(2,7,0)
         DataConI{} -> withDataFamInstCon tyConName $ \famTvbs ctxt parentName instTys cons ->
-            let !nbs = thd3 $ cxtAndTypeDataFamInstCon iClass parentName ctxt famTvbs instTys
-             in makeInvmapForCons nbs cons
+            let nbs = thd3 $ cxtAndTypeDataFamInstCon iClass parentName ctxt famTvbs instTys
+             in nbs `seq` makeInvmapForCons nbs cons
         FamilyI (FamilyD DataFam _ _ _) _ ->
             error $ ns ++ "Cannot use a data family name. Use a data family instance constructor instead."
         FamilyI (FamilyD TypeFam _ _ _) _ ->

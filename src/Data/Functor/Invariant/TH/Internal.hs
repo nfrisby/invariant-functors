@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 
 {-|
@@ -378,9 +377,9 @@ createKindChain = go starK
     go :: Kind -> Int -> Kind
     go k 0  = k
 #if MIN_VERSION_template_haskell(2,8,0)
-    go k !n = go (AppT (AppT ArrowT StarT) k) (n - 1)
+    go k n = n `seq` go (AppT (AppT ArrowT StarT) k) (n - 1)
 #else
-    go k !n = go (ArrowK StarK k) (n - 1)
+    go k n = n `seq` go (ArrowK StarK k) (n - 1)
 #endif
 
 distinctKindVars :: Kind -> Set Name
