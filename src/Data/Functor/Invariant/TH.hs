@@ -13,10 +13,12 @@ or to splice 'invmap' or 'invmap2' into Haskell source code. You need to enable
 the @TemplateHaskell@ language extension in order to use this module.
 -}
 module Data.Functor.Invariant.TH (
+      -- * @deriveInvariant(2)@
       -- $deriveInvariant
       deriveInvariant
       -- $deriveInvariant2
     , deriveInvariant2
+      -- * @makeInvmap(2)@
       -- $make
     , makeInvmap
     , makeInvmap2
