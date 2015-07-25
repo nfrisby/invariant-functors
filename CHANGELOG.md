@@ -1,4 +1,4 @@
-# next
+# 0.2
 * Support deriving `Invariant` and `Invariant2` instances with Template Haskell
 * Added `invmapFunctor`, `invmapContravariant`, `invmap2Bifunctor`, and
   `invmap2Profunctor` to make defining `Invmap` and `Invmap2` instances
