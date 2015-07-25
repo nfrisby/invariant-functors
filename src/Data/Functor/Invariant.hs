@@ -1,3 +1,7 @@
+{-# LANGUAGE CPP #-}
+
+#define GHC_GENERICS_OK __GLASGOW_HASKELL__ >= 706
+
 {-|
 Module:      Data.Functor.Invariant
 Copyright:   (C) 2012-2015 Nicolas Frisby, (C) 2015 Ryan Scott
@@ -10,6 +14,7 @@ Haskell98 invariant functors (also known as exponential functors).
 For more information, see Edward Kmett's article \"Rotten Bananas\":
 
 <http://comonad.com/reader/2008/rotten-bananas/>
+
 -}
 module Data.Functor.Invariant
   ( -- * @Invariant@
@@ -18,6 +23,10 @@ module Data.Functor.Invariant
   , WrappedFunctor(..)
   , invmapContravariant
   , WrappedContravariant(..)
+#if GHC_GENERICS_OK
+    -- ** @GHC.Generics@
+    -- $ghcgenerics
+#endif
     -- * @Invariant2@
   , Invariant2(..)
   , invmap2Bifunctor
@@ -26,6 +35,10 @@ module Data.Functor.Invariant
   , WrappedProfunctor(..)
   ) where
 
+#if GHC_GENERICS_OK
+import GHC.Generics
+
+#endif
 import Text.ParserCombinators.ReadP (ReadP)
 import Text.ParserCombinators.ReadPrec (ReadPrec)
 
@@ -397,3 +410,67 @@ instance Cochoice p => Cochoice (WrappedProfunctor p) where
 
 instance Closed p => Closed (WrappedProfunctor p) where
   closed = WrapProfunctor . closed . unwrapProfunctor
+#if GHC_GENERICS_OK
+
+
+
+
+
+-- | @GHC.Generics@
+instance Invariant V1 where
+  -- NSF 25 July 2015: I'd prefer an -XEmptyCase, but Haskell98.
+  invmap _ _ _ = error "Invariant V1"
+-- | @GHC.Generics@
+instance Invariant U1 where invmap _ _ _ = U1
+-- | @GHC.Generics@
+instance (Invariant l, Invariant r) => Invariant ((:+:) l r) where
+  invmap f g (L1 l) = L1 $ invmap f g l
+  invmap f g (R1 r) = R1 $ invmap f g r
+-- | @GHC.Generics@
+instance (Invariant l, Invariant r) => Invariant ((:*:) l r) where
+  invmap f g ~(l :*: r) = invmap f g l :*: invmap f g r
+-- | @GHC.Generics@
+instance Invariant (K1 i c) where invmap _ _ (K1 c) = K1 c
+-- | @GHC.Generics@
+instance Invariant2 (K1 i) where invmap2 f _ _ _ (K1 c) = K1 $ f c
+-- | @GHC.Generics@
+instance Invariant f => Invariant (M1 i t f) where invmap f g (M1 fp) = M1 $ invmap f g fp
+-- | @GHC.Generics@
+instance Invariant Par1 where invmap f _ (Par1 c) = Par1 $ f c
+-- | @GHC.Generics@
+instance Invariant f => Invariant (Rec1 f) where invmap f g (Rec1 fp) = Rec1 $ invmap f g fp
+-- | @GHC.Generics@; genuinely relying on this instance
+-- likely requires writing your 'Generic1' instance by hand
+instance (Invariant f, Invariant g) => Invariant ((:.:) f g) where
+  invmap f g (Comp1 fgp) = Comp1 $ invmap (invmap f g) (invmap g f) fgp
+
+
+
+
+
+{- $ghcgenerics
+
+Note: The restriction to Haskell98 prevents the full adoption of
+"GHC.Generics", but we are permitted to at least provide @Invariant@
+instances for the representation data types. Thus, while the \"ideal\"
+
+@
+  instance Invariant f => 'Invariant' (T f)
+@
+
+doesn't work --- because Haskell98 precludes our use of
+@-XDefaultSignatures@ in the class definition ---, the user only needs
+to do slightly more work:
+
+@
+  import GHC.Generics (from1,to1)
+
+  instance Invariant f => 'Invariant' (T f) where
+    invmap f g = 'to1' . 'invmap' f g . 'from1'
+@
+
+Note also that that instance is in fact Haskell98. Unfortunately, one
+would require @-XFlexibleContexts@ in order to factor that right-hand
+side out as reusable declaration polymorphic in the data type.
+-}
+#endif
