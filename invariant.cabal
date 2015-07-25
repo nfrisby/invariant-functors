@@ -29,6 +29,7 @@ library
                      , bifunctors           >= 5      && < 6
                      , containers           >= 0.1    && < 0.6
                      , contravariant        >= 0.1.2  && < 2
+                     , ghc-prim
                      , profunctors          >= 5      && < 6
                      , semigroups           >= 0.16.2 && < 1
                      , stm                  >= 2.2    && < 3

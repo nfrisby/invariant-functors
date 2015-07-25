@@ -1,6 +1,8 @@
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-deprecations #-}
 
+#define GHC_GENERICS_OK __GLASGOW_HASKELL__ >= 702
+
 {-|
 Module:      Data.Functor.Invariant
 Copyright:   (C) 2012-2015 Nicolas Frisby, (C) 2015 Ryan Scott
@@ -13,6 +15,7 @@ Haskell98 invariant functors (also known as exponential functors).
 For more information, see Edward Kmett's article \"Rotten Bananas\":
 
 <http://comonad.com/reader/2008/rotten-bananas/>
+
 -}
 module Data.Functor.Invariant
   ( -- * @Invariant@
@@ -21,6 +24,10 @@ module Data.Functor.Invariant
   , WrappedFunctor(..)
   , invmapContravariant
   , WrappedContravariant(..)
+#if GHC_GENERICS_OK
+    -- ** @GHC.Generics@
+    -- $ghcgenerics
+#endif
     -- * @Invariant2@
   , Invariant2(..)
   , invmap2Bifunctor
@@ -45,6 +52,9 @@ import           Data.Monoid (Alt(..))
 #endif
 import           Data.Monoid (Dual(..), Endo(..))
 import           Data.Proxy (Proxy(..))
+#if GHC_GENERICS_OK
+import           GHC.Generics
+#endif
 import           System.Console.GetOpt as GetOpt
 import           Text.ParserCombinators.ReadP (ReadP)
 import           Text.ParserCombinators.ReadPrec (ReadPrec)
@@ -161,17 +171,17 @@ instance Invariant ((,,,) a b c) where
 instance Invariant ((,,,,) a b c d) where
   invmap f _ ~(a, b, c, d, x) = (a, b, c, d, f x)
 
--- | @Control.Applicative@
+-- | from @Control.Applicative@
 instance Invariant (Const a) where invmap = invmapFunctor
--- | @Control.Applicative@
+-- | from @Control.Applicative@
 instance Invariant ZipList where invmap = invmapFunctor
--- | @Control.Applicative@
+-- | from @Control.Applicative@
 instance Monad m => Invariant (WrappedMonad m) where invmap = invmapFunctor
--- | @Control.Applicative@
+-- | from @Control.Applicative@
 instance Arrow arr => Invariant (App.WrappedArrow arr a) where
   invmap f _ (App.WrapArrow x) = App.WrapArrow $ ((arr f) Cat.. x)
 
--- | @Control.Arrow@
+-- | from @Control.Arrow@
 instance
 #if MIN_VERSION_base(4,4,0)
   Arrow a
@@ -181,54 +191,55 @@ instance
   => Invariant (ArrowMonad a) where
   invmap f _ (ArrowMonad m) = ArrowMonad $ m >>> arr f
 
--- | @Control.Exception@
+-- | from @Control.Exception@
 instance Invariant Handler where
   invmap f _ (Handler h) = Handler (fmap f . h)
 
--- | @Data.Functor.Identity@
+-- | from @Data.Functor.Identity@
 instance Invariant Identity where
   invmap = invmapFunctor
 
--- | @Data.Monoid@
+-- | from @Data.Monoid@
 instance Invariant Dual where invmap f _ (Dual x) = Dual (f x)
--- | @Data.Monoid@
+-- | from @Data.Monoid@
 instance Invariant Endo where
   invmap f g (Endo x) = Endo (f . x . g)
--- | @Data.Monoid@
+-- | from @Data.Monoid@
 instance Invariant Monoid.First where
   invmap f g (Monoid.First x) = Monoid.First (invmap f g x)
--- | @Data.Monoid@
+-- | from @Data.Monoid@
 instance Invariant Monoid.Last where
   invmap f g (Monoid.Last x) = Monoid.Last (invmap f g x)
 #if MIN_VERSION_base(4,8,0)
+-- | from @Data.Monoid@
 instance Invariant f => Invariant (Alt f) where
   invmap f g (Alt x) = Alt (invmap f g x)
 #endif
 
--- | @Data.Proxy@
+-- | from @Data.Proxy@
 instance Invariant Proxy where
   invmap = invmapFunctor
 
--- | @System.Console.GetOpt@
+-- | from @System.Console.GetOpt@
 instance Invariant ArgDescr where
   invmap f _ (NoArg a)    = NoArg (f a)
   invmap f _ (ReqArg g s) = ReqArg (f . g) s
   invmap f _ (OptArg g s) = OptArg (f . g) s
--- | @System.Console.GetOpt@
+-- | from @System.Console.GetOpt@
 instance Invariant ArgOrder where
   invmap _ _ RequireOrder      = RequireOrder
   invmap _ _ Permute           = Permute
   invmap f _ (ReturnInOrder g) = ReturnInOrder (f . g)
--- | @System.Console.GetOpt@
+-- | from @System.Console.GetOpt@
 instance Invariant OptDescr where
   invmap f g (GetOpt.Option a b argDescr c) = GetOpt.Option a b (invmap f g argDescr) c
 
 -- | from the @array@ package
 instance
 #if __GLASGOW_HASKELL__ < 711
-  Ix i
+  Ix i =>
 #endif
-  => Invariant (Array i) where
+    Invariant (Array i) where
   invmap = invmapFunctor
 
 -- | from the @bifunctors@ package
@@ -529,9 +540,9 @@ instance Invariant2 ((,,,) a b) where
 instance Invariant2 ((,,,,) a b c) where
   invmap2 f _ g _ ~(a, b, c, x, y) = (a, b, c, f x, g y)
 
--- | @Control.Applicative@
+-- | from @Control.Applicative@
 instance Invariant2 Const where invmap2 = invmap2Bifunctor
--- | @Control.Applicative@
+-- | from @Control.Applicative@
 instance Arrow arr => Invariant2 (App.WrappedArrow arr) where
   invmap2 _ f' g _ (App.WrapArrow x) = App.WrapArrow $ arr g Cat.. x Cat.. arr f'
 
@@ -662,3 +673,64 @@ instance Cochoice p => Cochoice (WrappedProfunctor p) where
 
 instance Closed p => Closed (WrappedProfunctor p) where
   closed = WrapProfunctor . closed . unwrapProfunctor
+
+#if GHC_GENERICS_OK
+-------------------------------------------------------------------------------
+-- GHC Generics
+-------------------------------------------------------------------------------
+
+-- | from @GHC.Generics@
+instance Invariant V1 where
+  -- NSF 25 July 2015: I'd prefer an -XEmptyCase, but Haskell98.
+  invmap _ _ _ = error "Invariant V1"
+-- | from @GHC.Generics@
+instance Invariant U1 where invmap _ _ _ = U1
+-- | from @GHC.Generics@
+instance (Invariant l, Invariant r) => Invariant ((:+:) l r) where
+  invmap f g (L1 l) = L1 $ invmap f g l
+  invmap f g (R1 r) = R1 $ invmap f g r
+-- | from @GHC.Generics@
+instance (Invariant l, Invariant r) => Invariant ((:*:) l r) where
+  invmap f g ~(l :*: r) = invmap f g l :*: invmap f g r
+-- | from @GHC.Generics@
+instance Invariant (K1 i c) where invmap _ _ (K1 c) = K1 c
+-- | from @GHC.Generics@
+instance Invariant2 (K1 i) where invmap2 f _ _ _ (K1 c) = K1 $ f c
+-- | from @GHC.Generics@
+instance Invariant f => Invariant (M1 i t f) where invmap f g (M1 fp) = M1 $ invmap f g fp
+-- | from @GHC.Generics@
+instance Invariant Par1 where invmap f _ (Par1 c) = Par1 $ f c
+-- | from @GHC.Generics@
+instance Invariant f => Invariant (Rec1 f) where invmap f g (Rec1 fp) = Rec1 $ invmap f g fp
+-- | from @GHC.Generics@; genuinely relying on this instance
+-- likely requires writing your 'Generic1' instance by hand
+instance (Invariant f, Invariant g) => Invariant ((:.:) f g) where
+  invmap f g (Comp1 fgp) = Comp1 $ invmap (invmap f g) (invmap g f) fgp
+
+
+{- $ghcgenerics
+
+Note: The restriction to Haskell98 prevents the full adoption of
+"GHC.Generics", but we are permitted to at least provide @Invariant@
+instances for the representation data types. Thus, while the \"ideal\"
+
+@
+  instance Invariant f => 'Invariant' (T f)
+@
+
+doesn't work --- because Haskell98 precludes our use of
+@-XDefaultSignatures@ in the class definition ---, the user only needs
+to do slightly more work:
+
+@
+  import GHC.Generics (from1,to1)
+
+  instance Invariant f => 'Invariant' (T f) where
+    invmap f g = 'to1' . 'invmap' f g . 'from1'
+@
+
+Note also that that instance is in fact Haskell98. Unfortunately, one
+would require @-XFlexibleContexts@ in order to factor that right-hand
+side out as reusable declaration polymorphic in the data type.
+-}
+#endif
