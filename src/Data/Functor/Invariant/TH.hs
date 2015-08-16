@@ -696,14 +696,14 @@ outOfPlaceTyVarError conName tyVarNames = error
     . showString " only in the last argument(s) of a data type"
     $ ""
 
-#if MIN_VERSION_template_haskell(2,7,0)
 -- | One of the last type variables cannot be eta-reduced (see the canEtaReduce
 -- function for the criteria it would have to meet).
 etaReductionError :: Type -> a
 etaReductionError instanceType = error $
     "Cannot eta-reduce to an instance of form \n\tinstance (...) => "
     ++ pprint instanceType
-#else
+
+#if !(MIN_VERSION_template_haskell(2,7,0))
 -- | Template Haskell didn't list all of a data family's instances upon reification
 -- until template-haskell-2.7.0.0, which is necessary for a derived Invariant instance
 -- to work.
