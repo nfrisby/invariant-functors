@@ -232,61 +232,16 @@ makeInvmap2 = makeInvmapClass Invariant2
 -- | Derive an Invariant(2) instance declaration (depending on the InvariantClass
 -- argument's value).
 deriveInvariantClass :: InvariantClass -> Name -> Q [Dec]
-deriveInvariantClass iClass tyConName = do
-    info <- reify tyConName
-    case info of
-        TyConI{} -> deriveInvariantPlainTy iClass tyConName
-#if MIN_VERSION_template_haskell(2,7,0)
-        DataConI{} -> deriveInvariantDataFamInst iClass tyConName
-        FamilyI (FamilyD DataFam _ _ _) _ ->
-            error $ ns ++ "Cannot use a data family name. Use a data family instance constructor instead."
-        FamilyI (FamilyD TypeFam _ _ _) _ ->
-            error $ ns ++ "Cannot use a type family name."
-        _ -> error $ ns ++ "The name must be of a plain type constructor or data family instance constructor."
-#else
-        DataConI{} -> dataConIError
-        _          -> error $ ns ++ "The name must be of a plain type constructor."
-#endif
+deriveInvariantClass iClass name = withType name fromCons
   where
-    ns :: String
-    ns = "Data.Functor.Invariant.TH.deriveInvariant: "
-
--- | Generates an Invariant(2) instance declaration for a plain type constructor.
-deriveInvariantPlainTy :: InvariantClass -> Name -> Q [Dec]
-deriveInvariantPlainTy iClass tyConName =
-    withTyCon tyConName fromCons
-  where
-    className :: Name
-    className = invariantClassNameTable iClass
-
-    fromCons :: Cxt -> [TyVarBndr] -> [Con] -> Q [Dec]
-    fromCons ctxt tvbs cons = (:[]) `fmap`
+    fromCons :: Name -> Cxt -> [TyVarBndr] -> [Con] -> Maybe [Type] -> Q [Dec]
+    fromCons name' ctxt tvbs cons mbTys = (:[]) `fmap`
         instanceD (return instanceCxt)
-                  (return $ AppT (ConT className) instanceType)
+                  (return instanceType)
                   (invmapDecs droppedNbs cons)
       where
         (instanceCxt, instanceType, droppedNbs) =
-            cxtAndTypePlainTy iClass tyConName ctxt tvbs
-
-#if MIN_VERSION_template_haskell(2,7,0)
--- | Generates an Invariant(2) instance declaration for a data family instance
--- constructor.
-deriveInvariantDataFamInst :: InvariantClass -> Name -> Q [Dec]
-deriveInvariantDataFamInst iClass dataFamInstName =
-    withDataFamInstCon dataFamInstName fromDec
-  where
-    className :: Name
-    className = invariantClassNameTable iClass
-
-    fromDec :: [TyVarBndr] -> Cxt -> Name -> [Type] -> [Con] -> Q [Dec]
-    fromDec famTvbs ctxt parentName instTys cons = (:[]) `fmap`
-        instanceD (return instanceCxt)
-                  (return $ AppT (ConT className) instanceType)
-                  (invmapDecs droppedNbs cons)
-      where
-        (instanceCxt, instanceType, droppedNbs) =
-            cxtAndTypeDataFamInstCon iClass parentName ctxt famTvbs instTys
-#endif
+            buildTypeInstance iClass name' ctxt tvbs mbTys
 
 -- | Generates a declaration defining the primary function corresponding to a
 -- particular class (invmap for Invariant and invmap2 for Invariant2).
@@ -300,33 +255,17 @@ invmapDecs nbs cons =
     ]
   where
     classFuncName :: Name
-    classFuncName = invmapNameTable . toEnum $ length nbs
+    classFuncName = invmapName . toEnum $ length nbs
 
 -- | Generates a lambda expression which behaves like invmap (for Invariant),
 -- or invmap2 (for Invariant2).
 makeInvmapClass :: InvariantClass -> Name -> Q Exp
-makeInvmapClass iClass tyConName = do
-    info <- reify tyConName
-    case info of
-        TyConI{} -> withTyCon tyConName $ \ctxt tvbs decs ->
-            let nbs = thd3 $ cxtAndTypePlainTy iClass tyConName ctxt tvbs
-             in nbs `seq` makeInvmapForCons nbs decs
-#if MIN_VERSION_template_haskell(2,7,0)
-        DataConI{} -> withDataFamInstCon tyConName $ \famTvbs ctxt parentName instTys cons ->
-            let nbs = thd3 $ cxtAndTypeDataFamInstCon iClass parentName ctxt famTvbs instTys
-             in nbs `seq` makeInvmapForCons nbs cons
-        FamilyI (FamilyD DataFam _ _ _) _ ->
-            error $ ns ++ "Cannot use a data family name. Use a data family instance constructor instead."
-        FamilyI (FamilyD TypeFam _ _ _) _ ->
-            error $ ns ++ "Cannot use a type family name."
-        _ -> error $ ns ++ "The name must be of a plain type constructor or data family instance constructor."
-#else
-        DataConI{} -> dataConIError
-        _          -> error $ ns ++ "The name must be of a plain type constructor."
-#endif
+makeInvmapClass iClass name = withType name fromCons
   where
-    ns :: String
-    ns = "Data.Functor.Invariant.TH.makeInvmap: "
+    fromCons :: Name -> Cxt -> [TyVarBndr] -> [Con] -> Maybe [Type] -> Q Exp
+    fromCons name' ctxt tvbs cons mbTys =
+        let nbs = thd3 $ buildTypeInstance iClass name' ctxt tvbs mbTys
+         in nbs `seq` makeInvmapForCons nbs cons
 
 -- | Generates a lambda expression for invmap(2) for the given constructors.
 -- All constructors must be from the same type.
@@ -343,10 +282,10 @@ makeInvmapForCons nbs cons = do
         argNames = concat (transpose [covMaps, contraMaps]) ++ [value]
     lamE (map varP argNames)
         . appsE
-        $ [ varE $ invmapConstNameTable iClass
+        $ [ varE $ invmapConstName iClass
           , if null cons
                then appE (varE errorValName)
-                         (stringE $ "Void " ++ nameBase (invmapNameTable iClass))
+                         (stringE $ "Void " ++ nameBase (invmapName iClass))
                else caseE (varE value)
                           (map (makeInvmapForCon iClass tvis) cons)
           ] ++ map varE argNames
@@ -471,7 +410,7 @@ makeInvmapForType iClass conName tvis covariant ty =
                       then outOfPlaceTyVarError conName tyVarNameBases
                       else if any (`mentionsNameBase` tyVarNameBases) rhsArgs
                            then appsE $
-                                ( varE (invmapNameTable (toEnum numLastArgs))
+                                ( varE (invmapName (toEnum numLastArgs))
                                 : doubleMap (makeInvmapForType iClass conName tvis) rhsArgs
                                 )
                            else do x <- newName "x"
@@ -482,76 +421,75 @@ makeInvmapForType iClass conName tvis covariant ty =
 -------------------------------------------------------------------------------
 
 -- | Extracts a plain type constructor's information.
-withTyCon :: Name -- ^ Name of the plain type constructor
-          -> (Cxt -> [TyVarBndr] -> [Con] -> Q a)
-          -> Q a
-withTyCon name f = do
-    info <- reify name
-    case info of
-        TyConI dec ->
-            case dec of
-                DataD    ctxt _ tvbs cons _ -> f ctxt tvbs cons
-                NewtypeD ctxt _ tvbs con  _ -> f ctxt tvbs [con]
-                other -> error $ ns ++ "Unsupported type " ++ show other ++ ". Must be a data type or newtype."
-        _ -> error $ ns ++ "The name must be of a plain type constructor."
-  where
-    ns :: String
-    ns = "Data.Functor.Invariant.TH.withTyCon: "
-
+-- | Boilerplate for top level splices.
+--
+-- The given Name must meet one of two criteria:
+--
+-- 1. It must be the name of a type constructor of a plain data type or newtype.
+-- 2. It must be the name of a data family instance or newtype instance constructor.
+--
+-- Any other value will result in an exception.
+withType :: Name
+         -> (Name -> Cxt -> [TyVarBndr] -> [Con] -> Maybe [Type] -> Q a)
+         -> Q a
+withType name f = do
+  info <- reify name
+  case info of
+    TyConI dec ->
+      case dec of
+        DataD    ctxt _ tvbs cons _ -> f name ctxt tvbs cons Nothing
+        NewtypeD ctxt _ tvbs con  _ -> f name ctxt tvbs [con] Nothing
+        _ -> error $ ns ++ "Unsupported type: " ++ show dec
 #if MIN_VERSION_template_haskell(2,7,0)
--- | Extracts a data family name's information.
-withDataFam :: Name -- ^ Name of the data family
-            -> ([TyVarBndr] -> [Dec] -> Q a)
-            -> Q a
-withDataFam name f = do
-    info <- reify name
-    case info of
-        FamilyI (FamilyD DataFam _ tvbs _) decs -> f tvbs decs
-        FamilyI (FamilyD TypeFam _ _    _) _    ->
-            error $ ns ++ "Cannot use a type family name."
-        other -> error $ ns ++ "Unsupported type " ++ show other ++ ". Must be a data family name."
-  where
-    ns :: String
-    ns = "Data.Functor.Invariant.TH.withDataFam: "
-
--- | Extracts a data family instance constructor's information.
-withDataFamInstCon :: Name -- ^ Name of the data family instance constructor
-                   -> ([TyVarBndr] -> Cxt -> Name -> [Type] -> [Con] -> Q a)
-                   -> Q a
-withDataFamInstCon dficName f = do
-    dficInfo <- reify dficName
-    case dficInfo of
-        DataConI _ _ parentName _ -> do
-            parentInfo <- reify parentName
-            case parentInfo of
-                FamilyI (FamilyD DataFam _ _ _) _ -> withDataFam parentName $ \famTvbs decs ->
-                    let sameDefDec = flip find decs $ \dec ->
-                          case dec of
-                              DataInstD    _ _ _ cons' _ -> any ((dficName ==) . constructorName) cons'
-                              NewtypeInstD _ _ _ con   _ -> dficName == constructorName con
-                              _ -> error $ ns ++ "Must be a data or newtype instance."
-
-                        (ctxt, instTys, cons) = case sameDefDec of
-                              Just (DataInstD    ctxt' _ instTys' cons' _) -> (ctxt', instTys', cons')
-                              Just (NewtypeInstD ctxt' _ instTys' con   _) -> (ctxt', instTys', [con])
-                              _ -> error $ ns ++ "Could not find data or newtype instance constructor."
-
-                    in f famTvbs ctxt parentName instTys cons
-                _ -> error $ ns ++ "Data constructor " ++ show dficName ++ " is not from a data family instance."
-        other -> error $ ns ++ "Unsupported type " ++ show other ++ ". Must be a data family instance constructor."
-  where
-    ns :: String
-    ns = "Data.Functor.Invariant.TH.withDataFamInstCon: "
+# if __GLASGOW_HASKELL__ >= 711
+    DataConI _ _ parentName   -> do
+# else
+    DataConI _ _ parentName _ -> do
+# endif
+      parentInfo <- reify parentName
+      case parentInfo of
+        FamilyI (FamilyD DataFam _ tvbs _) decs ->
+          let instDec = flip find decs $ \dec -> case dec of
+                DataInstD    _ _ _ cons _ -> any ((name ==) . constructorName) cons
+                NewtypeInstD _ _ _ con  _ -> name == constructorName con
+                _ -> error $ ns ++ "Must be a data or newtype instance."
+           in case instDec of
+                Just (DataInstD    ctxt _ instTys cons _)
+                  -> f parentName ctxt tvbs cons $ Just instTys
+                Just (NewtypeInstD ctxt _ instTys con  _)
+                  -> f parentName ctxt tvbs [con] $ Just instTys
+                _ -> error $ ns ++
+                  "Could not find data or newtype instance constructor."
+        _ -> error $ ns ++ "Data constructor " ++ show name ++
+          " is not from a data family instance constructor."
+    FamilyI (FamilyD DataFam _ _ _) _ -> error $ ns ++
+      "Cannot use a data family name. Use a data family instance constructor instead."
+    _ -> error $ ns ++ "The name must be of a plain data type constructor, "
+                    ++ "or a data family instance constructor."
+#else
+    DataConI{} -> dataConIError
+    _          -> error $ ns ++ "The name must be of a plain type constructor."
 #endif
+  where
+    ns :: String
+    ns = "Data.Functor.Invariant.TH.withType: "
 
--- | Deduces the Invariant(2) instance context, instance head, and eta-reduced
--- type variables for a plain data type constructor.
-cxtAndTypePlainTy :: InvariantClass -- Invariant or Invariant2
-                  -> Name           -- The datatype's name
-                  -> Cxt            -- The datatype context
-                  -> [TyVarBndr]    -- The type variables
+-- | Deduces the instance context, instance head, and eta-reduced type variables
+-- for an instance.
+buildTypeInstance :: InvariantClass
+                  -- ^ Invariant or Invariant2
+                  -> Name
+                  -- ^ The type constructor or data family name
+                  -> Cxt
+                  -- ^ The datatype context
+                  -> [TyVarBndr]
+                  -- ^ The type variables from the data type/data family declaration
+                  -> Maybe [Type]
+                  -- ^ 'Just' the types used to instantiate a data family instance,
+                  -- or 'Nothing' if it's a plain data type
                   -> (Cxt, Type, [NameBase])
-cxtAndTypePlainTy iClass tyConName dataCxt tvbs =
+-- Plain data type/newtype case
+buildTypeInstance iClass tyConName dataCxt tvbs Nothing =
     if remainingLength < 0 || not (wellKinded droppedKinds) -- If we have enough well-kinded type variables
        then derivingKindError iClass tyConName
     else if any (`predMentionsNameBase` droppedNbs) dataCxt -- If the last type variable(s) are mentioned in a datatype context
@@ -563,7 +501,9 @@ cxtAndTypePlainTy iClass tyConName dataCxt tvbs =
                 $ filter (needsConstraint iClass . tvbKind) remaining
 
     instanceType :: Type
-    instanceType = applyTyCon tyConName $ map (VarT . tvbName) remaining
+    instanceType = AppT (ConT $ invariantClassName iClass)
+                 . applyTyCon tyConName
+                 $ map (VarT . tvbName) remaining
 
     remainingLength :: Int
     remainingLength = length tvbs - fromEnum iClass
@@ -576,17 +516,8 @@ cxtAndTypePlainTy iClass tyConName dataCxt tvbs =
 
     droppedNbs :: [NameBase]
     droppedNbs = map (NameBase . tvbName) dropped
-
-#if MIN_VERSION_template_haskell(2,7,0)
--- | Deduces the Invariant(2) instance context, instance head, and eta-reduced
--- type variables for a data family instnce constructor.
-cxtAndTypeDataFamInstCon :: InvariantClass -- Invariant or Invariant2
-                         -> Name           -- The data family name
-                         -> Cxt            -- The datatype context
-                         -> [TyVarBndr]    -- The data family declaration's type variables
-                         -> [Type]         -- The data family instance types
-                         -> (Cxt, Type, [NameBase])
-cxtAndTypeDataFamInstCon iClass parentName dataCxt famTvbs instTysAndKinds =
+-- Data family instance case
+buildTypeInstance iClass parentName dataCxt tvbs (Just instTysAndKinds) =
     if remainingLength < 0 || not (wellKinded droppedKinds) -- If we have enough well-kinded type variables
        then derivingKindError iClass parentName
     else if any (`predMentionsNameBase` droppedNbs) dataCxt -- If the last type variable(s) are mentioned in a datatype context
@@ -608,17 +539,18 @@ cxtAndTypeDataFamInstCon iClass parentName dataCxt famTvbs instTysAndKinds =
     --
     -- To do this, we remove every kind ascription (i.e., strip off every 'SigT').
     instanceType :: Type
-    instanceType = applyTyCon parentName
+    instanceType = AppT (ConT $ invariantClassName iClass)
+                 . applyTyCon parentName
                  $ map unSigT remaining
 
     remainingLength :: Int
-    remainingLength = length famTvbs - fromEnum iClass
+    remainingLength = length tvbs - fromEnum iClass
 
     remaining, dropped :: [Type]
     (remaining, dropped) = splitAt remainingLength rhsTypes
 
     droppedKinds :: [Kind]
-    droppedKinds = map tvbKind . snd $ splitAt remainingLength famTvbs
+    droppedKinds = map tvbKind . snd $ splitAt remainingLength tvbs
 
     droppedNbs :: [NameBase]
     droppedNbs = map varTToNameBase dropped
@@ -636,18 +568,18 @@ cxtAndTypeDataFamInstCon iClass parentName dataCxt famTvbs instTysAndKinds =
     -- then dropping that number of entries from @instTysAndKinds@.
     instTypes :: [Type]
     instTypes =
-# if __GLASGOW_HASKELL__ >= 710 || !(MIN_VERSION_template_haskell(2,8,0))
+#if __GLASGOW_HASKELL__ >= 710 || !(MIN_VERSION_template_haskell(2,8,0))
         instTysAndKinds
-# else
-        drop (Set.size . Set.unions $ map (distinctKindVars . tvbKind) famTvbs)
+#else
+        drop (Set.size . Set.unions $ map (distinctKindVars . tvbKind) tvbs)
              instTysAndKinds
-# endif
+#endif
 
     lhsTvbs :: [TyVarBndr]
     lhsTvbs = map (uncurry replaceTyVarName)
             . filter (isTyVar . snd)
             . take remainingLength
-            $ zip famTvbs rhsTypes
+            $ zip tvbs rhsTypes
 
     -- In GHC 7.8, only the @Type@s up to the rightmost non-eta-reduced type variable
     -- in @instTypes@ are provided (as a result of this extremely annoying bug:
@@ -679,13 +611,12 @@ cxtAndTypeDataFamInstCon iClass parentName dataCxt famTvbs instTysAndKinds =
     -- Thankfully, other versions of GHC don't seem to have this bug.
     rhsTypes :: [Type]
     rhsTypes =
-# if __GLASGOW_HASKELL__ >= 708 && __GLASGOW_HASKELL__ < 710
+#if __GLASGOW_HASKELL__ >= 708 && __GLASGOW_HASKELL__ < 710
             instTypes ++ map tvbToType
                              (drop (length instTypes)
-                                   famTvbs)
-# else
+                                   tvbs)
+#else
             instTypes
-# endif
 #endif
 
 -- | Given a TyVarBndr, apply an Invariant(2) constraint to it, depending
@@ -695,7 +626,7 @@ applyInvariantConstraint (PlainTV  _)         = error "Cannot constrain type of 
 applyInvariantConstraint (KindedTV name kind) = applyClass className name
   where
     className :: Name
-    className = invariantClassNameTable . toEnum $ numKindArrows kind
+    className = invariantClassName . toEnum $ numKindArrows kind
 
 -- | Can a kind signature inhabit an Invariant constraint?
 --
@@ -732,7 +663,7 @@ derivingKindError iClass tyConName = error
     $ ""
   where
     className :: String
-    className = nameBase $ invariantClassNameTable iClass
+    className = nameBase $ invariantClassName iClass
 
 -- | The data type has a DatatypeContext which mentions one of the eta-reduced
 -- type variables.
