@@ -1,7 +1,7 @@
 # next
 * Added `Data.Functor.Invariant.Generic` module, which exports a
   `genericInvmap` function on GHC 7.2 or later
-* Make `Proxy` and `Tagged` instances poly-kinded
+* Make `Tagged` instance poly-kinded
 
 # 0.2
 * Support deriving `Invariant` and `Invariant2` instances with Template Haskell
