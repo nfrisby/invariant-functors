@@ -20,6 +20,7 @@ source-repository head
 
 library
   exposed-modules:     Data.Functor.Invariant
+                       Data.Functor.Invariant.Generic
                      , Data.Functor.Invariant.TH
   other-modules:       Data.Functor.Invariant.TH.Internal
                      , Paths_invariant

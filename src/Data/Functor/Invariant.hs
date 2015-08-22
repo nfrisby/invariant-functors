@@ -3,6 +3,10 @@
 
 #define GHC_GENERICS_OK __GLASGOW_HASKELL__ >= 702
 
+#if __GLASGOW_HASKELL__ >= 706
+{-# LANGUAGE PolyKinds #-}
+#endif
+
 {-|
 Module:      Data.Functor.Invariant
 Copyright:   (C) 2012-2015 Nicolas Frisby, (C) 2015 Ryan Scott
@@ -24,10 +28,6 @@ module Data.Functor.Invariant
   , WrappedFunctor(..)
   , invmapContravariant
   , WrappedContravariant(..)
-#if GHC_GENERICS_OK
-    -- ** @GHC.Generics@
-    -- $ghcgenerics
-#endif
     -- * @Invariant2@
   , Invariant2(..)
   , invmap2Bifunctor
@@ -708,31 +708,4 @@ instance Invariant f => Invariant (Rec1 f) where invmap f g (Rec1 fp) = Rec1 $ i
 -- likely requires writing your 'Generic1' instance by hand
 instance (Invariant f, Invariant g) => Invariant ((:.:) f g) where
   invmap f g (Comp1 fgp) = Comp1 $ invmap (invmap f g) (invmap g f) fgp
-
-
-{- $ghcgenerics
-
-Note: The restriction to Haskell98 prevents the full adoption of
-"GHC.Generics", but we are permitted to at least provide @Invariant@
-instances for the representation data types. Thus, while the \"ideal\"
-
-@
-  instance Invariant f => 'Invariant' (T f)
-@
-
-doesn't work --- because Haskell98 precludes our use of
-@-XDefaultSignatures@ in the class definition ---, the user only needs
-to do slightly more work:
-
-@
-  import GHC.Generics (from1,to1)
-
-  instance Invariant f => 'Invariant' (T f) where
-    invmap f g = 'to1' . 'invmap' f g . 'from1'
-@
-
-Note also that that instance is in fact Haskell98. Unfortunately, one
-would require @-XFlexibleContexts@ in order to factor that right-hand
-side out as reusable declaration polymorphic in the data type.
--}
 #endif
