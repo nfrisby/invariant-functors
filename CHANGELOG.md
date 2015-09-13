@@ -1,3 +1,6 @@
+# next
+* Add `Foldable` and `Traversable` instances for `WrappedFunctor`
+
 # 0.2
 * Support deriving `Invariant` and `Invariant2` instances with Template Haskell
 * Added `invmapFunctor`, `invmapContravariant`, `invmap2Bifunctor`, and

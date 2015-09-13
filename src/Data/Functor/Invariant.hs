@@ -41,9 +41,10 @@ import qualified Control.Category as Cat
 import           Control.Arrow
 import           Control.Applicative as App
 import           Control.Exception (Handler(..))
-import           Control.Monad (MonadPlus(..))
+import           Control.Monad (MonadPlus(..), liftM)
 import qualified Control.Monad.ST as Strict (ST)
 import qualified Control.Monad.ST.Lazy as Lazy (ST)
+import qualified Data.Foldable as F (Foldable(..))
 import           Data.Functor.Identity (Identity)
 #if __GLASGOW_HASKELL__ < 711
 import           Data.Ix (Ix)
@@ -54,6 +55,7 @@ import           Data.Monoid (Alt(..))
 #endif
 import           Data.Monoid (Dual(..), Endo(..))
 import           Data.Proxy (Proxy(..))
+import qualified Data.Traversable as T (Traversable(..))
 #if GHC_GENERICS_OK
 import           GHC.Generics
 #endif
@@ -475,6 +477,31 @@ instance Monad m => Monad (WrappedFunctor m) where
 instance MonadPlus m => MonadPlus (WrappedFunctor m) where
   mzero = WrapFunctor mzero
   WrapFunctor x `mplus` WrapFunctor y = WrapFunctor $ x `mplus` y
+
+instance F.Foldable f => F.Foldable (WrappedFunctor f) where
+  fold       = F.fold       . unwrapFunctor
+  foldMap f  = F.foldMap f  . unwrapFunctor
+  foldr f z  = F.foldr f z  . unwrapFunctor
+  foldl f q  = F.foldl f q  . unwrapFunctor
+  foldl' f q = F.foldl' f q . unwrapFunctor
+  foldr1 f   = F.foldr1 f   . unwrapFunctor
+  foldl1 f   = F.foldl1 f   . unwrapFunctor
+#if MIN_VERSION_base(4,8,0)
+  toList     = F.toList     . unwrapFunctor
+  null       = F.null       . unwrapFunctor
+  length     = F.length     . unwrapFunctor
+  elem x     = F.elem x     . unwrapFunctor
+  maximum    = F.maximum    . unwrapFunctor
+  minimum    = F.minimum    . unwrapFunctor
+  sum        = F.sum        . unwrapFunctor
+  product    = F.product    . unwrapFunctor
+#endif
+
+instance T.Traversable f => T.Traversable (WrappedFunctor f) where
+  traverse f = fmap  WrapFunctor . T.traverse f . unwrapFunctor
+  sequenceA  = fmap  WrapFunctor . T.sequenceA  . unwrapFunctor
+  mapM f     = liftM WrapFunctor . T.mapM f     . unwrapFunctor
+  sequence   = liftM WrapFunctor . T.sequence   . unwrapFunctor
 
 -------------------------------------------------------------------------------
 -- WrappedContravariant
