@@ -1,5 +1,6 @@
 # next
 * Add `Foldable` and `Traversable` instances for `WrappedFunctor`
+* Fixed build on GHC HEAD
 
 # 0.2
 * Support deriving `Invariant` and `Invariant2` instances with Template Haskell
