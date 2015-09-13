@@ -483,9 +483,12 @@ instance F.Foldable f => F.Foldable (WrappedFunctor f) where
   foldMap f  = F.foldMap f  . unwrapFunctor
   foldr f z  = F.foldr f z  . unwrapFunctor
   foldl f q  = F.foldl f q  . unwrapFunctor
-  foldl' f q = F.foldl' f q . unwrapFunctor
   foldr1 f   = F.foldr1 f   . unwrapFunctor
   foldl1 f   = F.foldl1 f   . unwrapFunctor
+#if MIN_VERSION_base(4,6,0)
+  foldr' f z = F.foldr' f z . unwrapFunctor
+  foldl' f q = F.foldl' f q . unwrapFunctor
+#endif
 #if MIN_VERSION_base(4,8,0)
   toList     = F.toList     . unwrapFunctor
   null       = F.null       . unwrapFunctor
