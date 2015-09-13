@@ -1,4 +1,4 @@
-# next
+# 0.2.1
 * Add `Foldable` and `Traversable` instances for `WrappedFunctor`
 * Fixed build on GHC HEAD
 
