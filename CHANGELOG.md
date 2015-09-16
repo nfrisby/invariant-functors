@@ -1,6 +1,6 @@
 # next
-* Added `Data.Functor.Invariant.Generic` module, which exports a
-  `genericInvmap` function on GHC 7.2 or later
+* Add `genericInvmap` function (and make it the default implementation of
+  `invmap` for `Invariant` instances) on GHC 7.2 or later
 * Make `Tagged` instance poly-kinded
 
 # 0.2

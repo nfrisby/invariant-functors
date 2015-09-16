@@ -3,6 +3,11 @@
 
 #define GHC_GENERICS_OK __GLASGOW_HASKELL__ >= 702
 
+#if GHC_GENERICS_OK
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE FlexibleContexts #-}
+#endif
+
 #if __GLASGOW_HASKELL__ >= 706
 {-# LANGUAGE PolyKinds #-}
 #endif
@@ -25,6 +30,11 @@ module Data.Functor.Invariant
   ( -- * @Invariant@
     Invariant(..)
   , invmapFunctor
+#if GHC_GENERICS_OK
+    -- ** @GHC.Generics@
+    -- $ghcgenerics
+  , genericInvmap
+#endif
   , WrappedFunctor(..)
   , invmapContravariant
   , WrappedContravariant(..)
@@ -144,6 +154,10 @@ import           Data.HashMap.Lazy (HashMap)
 -- > invmap f2 f2' . invmap f1 f1' = invmap (f2 . f1) (f1' . f2')
 class Invariant f where
   invmap :: (a -> b) -> (b -> a) -> f a -> f b
+#if GHC_GENERICS_OK
+  default invmap :: (Generic1 f, Invariant (Rep1 f)) => (a -> b) -> (b -> a) -> f a -> f b
+  invmap = genericInvmap
+#endif
 
 -- | Every 'Functor' is also an 'Invariant' functor.
 invmapFunctor :: Functor f => (a -> b) -> (b -> a) -> f a -> f b
@@ -708,4 +722,29 @@ instance Invariant f => Invariant (Rec1 f) where invmap f g (Rec1 fp) = Rec1 $ i
 -- likely requires writing your 'Generic1' instance by hand
 instance (Invariant f, Invariant g) => Invariant ((:.:) f g) where
   invmap f g (Comp1 fgp) = Comp1 $ invmap (invmap f g) (invmap g f) fgp
+
+{- $ghcgenerics
+With GHC 7.2 or later, 'Invariant' instances can be defined easily using GHC
+generics like so:
+
+@
+&#123;-&#35; LANGUAGE DeriveGeneric, FlexibleContexts &#35;-&#125;
+
+import Data.Functor.Invariant
+import GHC.Generics
+
+data T f a = T (f a) deriving Generic1
+
+instance Invariant f => 'Invariant' (T f)
+@
+
+Be aware that generic 'Invariant' instances cannot be derived for data types
+that have function arguments in which the last type parameter appears in a
+position other than the result type (e.g., @data Fun a = Fun (a -> a)@). For
+these, you can derive them using the "Data.Functor.Invariant.TH" module.
+-}
+
+-- | A generic implementation of 'invmap'.
+genericInvmap :: (Generic1 f, Invariant (Rep1 f)) => (a -> b) -> (b -> a) -> f a -> f b
+genericInvmap f g = to1 . invmap f g . from1
 #endif
