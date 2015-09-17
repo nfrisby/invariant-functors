@@ -9,7 +9,7 @@ homepage:            https://github.com/nfrisby/invariant-functors
 bug-reports:         https://github.com/nfrisby/invariant-functors/issues
 author:              Nicolas Frisby <nicolas.frisby@gmail.com>
 maintainer:          Nicolas Frisby <nicolas.frisby@gmail.com>,
-                     Ryan Scott <ryan.gl.scott@ku.edu>
+                     Ryan Scott <ryan.gl.scott@gmail.com>
 build-type:          Simple
 cabal-version:       >= 1.9.2
 extra-source-files:  CHANGELOG.md, README.md
