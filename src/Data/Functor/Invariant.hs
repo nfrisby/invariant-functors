@@ -3,6 +3,15 @@
 
 #define GHC_GENERICS_OK __GLASGOW_HASKELL__ >= 702
 
+#if GHC_GENERICS_OK
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE FlexibleContexts #-}
+#endif
+
+#if __GLASGOW_HASKELL__ >= 706
+{-# LANGUAGE PolyKinds #-}
+#endif
+
 {-|
 Module:      Data.Functor.Invariant
 Copyright:   (C) 2012-2015 Nicolas Frisby, (C) 2015 Ryan Scott
@@ -21,13 +30,14 @@ module Data.Functor.Invariant
   ( -- * @Invariant@
     Invariant(..)
   , invmapFunctor
-  , WrappedFunctor(..)
-  , invmapContravariant
-  , WrappedContravariant(..)
 #if GHC_GENERICS_OK
     -- ** @GHC.Generics@
     -- $ghcgenerics
+  , genericInvmap
 #endif
+  , WrappedFunctor(..)
+  , invmapContravariant
+  , WrappedContravariant(..)
     -- * @Invariant2@
   , Invariant2(..)
   , invmap2Bifunctor
@@ -146,6 +156,10 @@ import           Data.HashMap.Lazy (HashMap)
 -- > invmap f2 f2' . invmap f1 f1' = invmap (f2 . f1) (f1' . f2')
 class Invariant f where
   invmap :: (a -> b) -> (b -> a) -> f a -> f b
+#if GHC_GENERICS_OK
+  default invmap :: (Generic1 f, Invariant (Rep1 f)) => (a -> b) -> (b -> a) -> f a -> f b
+  invmap = genericInvmap
+#endif
 
 -- | Every 'Functor' is also an 'Invariant' functor.
 invmapFunctor :: Functor f => (a -> b) -> (b -> a) -> f a -> f b
@@ -739,30 +753,28 @@ instance Invariant f => Invariant (Rec1 f) where invmap f g (Rec1 fp) = Rec1 $ i
 instance (Invariant f, Invariant g) => Invariant ((:.:) f g) where
   invmap f g (Comp1 fgp) = Comp1 $ invmap (invmap f g) (invmap g f) fgp
 
-
 {- $ghcgenerics
-
-Note: The restriction to Haskell98 prevents the full adoption of
-"GHC.Generics", but we are permitted to at least provide @Invariant@
-instances for the representation data types. Thus, while the \"ideal\"
+With GHC 7.2 or later, 'Invariant' instances can be defined easily using GHC
+generics like so:
 
 @
-  instance Invariant f => 'Invariant' (T f)
+&#123;-&#35; LANGUAGE DeriveGeneric, FlexibleContexts &#35;-&#125;
+
+import Data.Functor.Invariant
+import GHC.Generics
+
+data T f a = T (f a) deriving Generic1
+
+instance Invariant f => 'Invariant' (T f)
 @
 
-doesn't work --- because Haskell98 precludes our use of
-@-XDefaultSignatures@ in the class definition ---, the user only needs
-to do slightly more work:
-
-@
-  import GHC.Generics (from1,to1)
-
-  instance Invariant f => 'Invariant' (T f) where
-    invmap f g = 'to1' . 'invmap' f g . 'from1'
-@
-
-Note also that that instance is in fact Haskell98. Unfortunately, one
-would require @-XFlexibleContexts@ in order to factor that right-hand
-side out as reusable declaration polymorphic in the data type.
+Be aware that generic 'Invariant' instances cannot be derived for data types
+that have function arguments in which the last type parameter appears in a
+position other than the result type (e.g., @data Fun a = Fun (a -> a)@). For
+these, you can derive them using the "Data.Functor.Invariant.TH" module.
 -}
+
+-- | A generic implementation of 'invmap'.
+genericInvmap :: (Generic1 f, Invariant (Rep1 f)) => (a -> b) -> (b -> a) -> f a -> f b
+genericInvmap f g = to1 . invmap f g . from1
 #endif
