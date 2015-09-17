@@ -1,7 +1,11 @@
-# next
+# 0.2.2
 * Add `genericInvmap` function (and make it the default implementation of
   `invmap` for `Invariant` instances) on GHC 7.2 or later
 * Make `Tagged` instance poly-kinded
+
+# 0.2.1
+* Add `Foldable` and `Traversable` instances for `WrappedFunctor`
+* Fixed build on GHC HEAD
 
 # 0.2
 * Support deriving `Invariant` and `Invariant2` instances with Template Haskell

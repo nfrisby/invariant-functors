@@ -1,5 +1,5 @@
 name:                invariant
-version:             0.2
+version:             0.2.2
 synopsis:            Haskell 98 invariant functors
 description:         Haskell 98 invariant functors
 category:            Control, Data
@@ -34,7 +34,7 @@ library
                      , semigroups           >= 0.16.2 && < 1
                      , stm                  >= 2.2    && < 3
                      , tagged               >= 0.7.3  && < 1
-                     , template-haskell     >= 2.4    && < 2.11
+                     , template-haskell     >= 2.4    && < 2.12
                      , transformers         >= 0.2    && < 0.5
                      , transformers-compat  >= 0.3    && < 1
                      , unordered-containers >= 0.2.4  && < 0.3
