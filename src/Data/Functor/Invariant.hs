@@ -105,6 +105,7 @@ import           Data.Profunctor.Cayley
 import           Data.Profunctor.Closed
 import           Data.Profunctor.Codensity
 import           Data.Profunctor.Composition
+import           Data.Profunctor.Monad
 import           Data.Profunctor.Ran
 import           Data.Profunctor.Tambara
 
@@ -723,6 +724,17 @@ instance Cochoice p => Cochoice (WrappedProfunctor p) where
 
 instance Closed p => Closed (WrappedProfunctor p) where
   closed = WrapProfunctor . closed . unwrapProfunctor
+
+instance ProfunctorFunctor WrappedProfunctor where
+  promap f = WrapProfunctor . f . unwrapProfunctor
+
+instance ProfunctorMonad WrappedProfunctor where
+  proreturn = WrapProfunctor
+  projoin   = unwrapProfunctor
+
+instance ProfunctorComonad WrappedProfunctor where
+  proextract   = unwrapProfunctor
+  produplicate = WrapProfunctor
 
 #if GHC_GENERICS_OK
 -------------------------------------------------------------------------------

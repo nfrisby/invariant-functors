@@ -1,3 +1,7 @@
+# next
+* Add `Invariant` instance for `Fix` (added in `bifunctors-5.1`)
+* Add `ProfunctorFunctor`, `ProfunctorMonad`, and `ProfunctorComonad` instances for `WrappedProfunctor`
+
 # 0.2.2
 * Add `genericInvmap` function (and make it the default implementation of
   `invmap` for `Invariant` instances) on GHC 7.2 or later
