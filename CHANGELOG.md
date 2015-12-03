@@ -1,5 +1,6 @@
 # next
 * Add `Invariant` instance for `Fix` (added in `bifunctors-5.1`)
+* Add `Invariant` instances for `Prep` and `Coprep` (added in `profunctors-5.1.2`)
 * Add `ProfunctorFunctor`, `ProfunctorMonad`, and `ProfunctorComonad` instances for `WrappedProfunctor`
 
 # 0.2.2

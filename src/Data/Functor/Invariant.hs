@@ -106,6 +106,7 @@ import           Data.Profunctor.Closed
 import           Data.Profunctor.Codensity
 import           Data.Profunctor.Composition
 import           Data.Profunctor.Monad
+import           Data.Profunctor.Rep
 import           Data.Profunctor.Ran
 import           Data.Profunctor.Tambara
 
@@ -343,6 +344,12 @@ instance Invariant2 p => Invariant (Closure p a) where
 -- | from the @profunctors@ package
 instance Invariant2 p => Invariant (Codensity p a) where
   invmap = invmap2 id id
+-- | from the @profunctors@ package
+instance Invariant2 p => Invariant (Coprep p) where
+  invmap f g (Coprep h) = Coprep (h . invmap2 g f id id)
+-- | from the @profunctors@ package
+instance Invariant2 p => Invariant (Prep p) where
+  invmap f g (Prep x p) = Prep x (invmap2 id id f g p)
 -- | from the @profunctors@ package
 instance Invariant2 p => Invariant (Procompose p q a) where
   invmap k k' (Procompose f g) = Procompose (invmap2 id id k k' f) g
