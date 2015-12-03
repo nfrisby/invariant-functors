@@ -80,6 +80,7 @@ import           Data.Array (Array)
 import           Data.Bifunctor hiding (first)
 import           Data.Bifunctor.Biff
 import           Data.Bifunctor.Clown
+import           Data.Bifunctor.Fix
 import           Data.Bifunctor.Flip
 import           Data.Bifunctor.Join
 import           Data.Bifunctor.Joker
@@ -266,6 +267,9 @@ instance (Invariant2 p, Invariant g) => Invariant (Biff p f g a) where
 -- | from the @bifunctors@ package
 instance Invariant (Clown f a) where
   invmap = invmapFunctor
+-- | from the @bifunctors@ package
+instance Invariant2 p => Invariant (Fix p) where
+  invmap f g = In . invmap2 (invmap f g) (invmap g f) f g . out
 -- | from the @bifunctors@ package
 instance Invariant2 p => Invariant (Flip p a) where
   invmap = invmap2 id id
