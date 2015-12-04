@@ -483,7 +483,7 @@ newtype WrappedFunctor f a = WrapFunctor { unwrapFunctor :: f a }
   deriving (Eq, Ord, Read, Show)
 
 instance Functor f => Invariant (WrappedFunctor f) where
-  invmap f g = WrapFunctor . invmapFunctor f g . unwrapFunctor
+  invmap = invmapFunctor
 
 instance Functor f => Functor (WrappedFunctor f) where
   fmap f = WrapFunctor . fmap f . unwrapFunctor
@@ -541,7 +541,7 @@ newtype WrappedContravariant f a = WrapContravariant { unwrapContravariant :: f 
   deriving (Eq, Ord, Read, Show)
 
 instance Contravariant f => Invariant (WrappedContravariant f) where
-  invmap f g = WrapContravariant . invmapContravariant f g . unwrapContravariant
+  invmap = invmapContravariant
 
 instance Contravariant f => Contravariant (WrappedContravariant f) where
   contramap f = WrapContravariant . contramap f . unwrapContravariant
@@ -627,7 +627,7 @@ instance (Invariant f, Invariant2 p) => Invariant2 (Tannen f p) where
     Tannen . invmap (invmap2 f f' g g') (invmap2 f' f g' g) . runTannen
 -- | from the @bifunctors@ package
 instance Bifunctor p => Invariant2 (WrappedBifunctor p) where
-  invmap2 f f' g g' = WrapBifunctor . invmap2Bifunctor f f' g g' . unwrapBifunctor
+  invmap2 = invmap2Bifunctor
 
 -- | from the @contravariant@ package
 instance Invariant2 Op where
@@ -705,7 +705,7 @@ newtype WrappedProfunctor p a b = WrapProfunctor { unwrapProfunctor :: p a b }
   deriving (Eq, Ord, Read, Show)
 
 instance Profunctor p => Invariant2 (WrappedProfunctor p) where
-  invmap2 f f' g g' = WrapProfunctor . invmap2Profunctor f f' g g' . unwrapProfunctor
+  invmap2 = invmap2Profunctor
 
 instance Profunctor p => Invariant (WrappedProfunctor p a) where
   invmap = invmap2 id id
