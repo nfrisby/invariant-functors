@@ -55,9 +55,6 @@ import           Control.Monad (MonadPlus(..), liftM)
 import qualified Control.Monad.ST as Strict (ST)
 import qualified Control.Monad.ST.Lazy as Lazy (ST)
 import qualified Data.Foldable as F (Foldable(..))
-#if !(MIN_VERSION_base(4,8,0))
-import           Data.Functor (Functor(..))
-#endif
 import           Data.Functor.Identity (Identity)
 #if __GLASGOW_HASKELL__ < 711
 import           Data.Ix (Ix)
