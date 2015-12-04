@@ -55,6 +55,9 @@ import           Control.Monad (MonadPlus(..), liftM)
 import qualified Control.Monad.ST as Strict (ST)
 import qualified Control.Monad.ST.Lazy as Lazy (ST)
 import qualified Data.Foldable as F (Foldable(..))
+#if !(MIN_VERSION_base(4,8,0))
+import           Data.Functor (Functor(..))
+#endif
 import           Data.Functor.Identity (Identity)
 #if __GLASGOW_HASKELL__ < 711
 import           Data.Ix (Ix)
@@ -109,6 +112,7 @@ import           Data.Profunctor.Monad
 import           Data.Profunctor.Rep
 import           Data.Profunctor.Ran
 import           Data.Profunctor.Tambara
+import           Data.Profunctor.Unsafe
 
 -- semigroups
 import           Data.List.NonEmpty (NonEmpty(..))
@@ -210,7 +214,7 @@ instance
   ArrowApply a
 #endif
   => Invariant (ArrowMonad a) where
-  invmap f _ (ArrowMonad m) = ArrowMonad $ m >>> arr f
+  invmap f _ (ArrowMonad m) = ArrowMonad (m >>> arr f)
 
 -- | from @Control.Exception@
 instance Invariant Handler where
@@ -487,22 +491,28 @@ instance Functor f => Invariant (WrappedFunctor f) where
 
 instance Functor f => Functor (WrappedFunctor f) where
   fmap f = WrapFunctor . fmap f . unwrapFunctor
+  x <$ WrapFunctor f = WrapFunctor (x <$ f)
 
 instance Applicative f => Applicative (WrappedFunctor f) where
   pure = WrapFunctor . pure
-  WrapFunctor f <*> WrapFunctor x = WrapFunctor $ f <*> x
+  WrapFunctor f <*> WrapFunctor x = WrapFunctor (f <*> x)
+  WrapFunctor a *>  WrapFunctor b = WrapFunctor (a *>  b)
+  WrapFunctor a <*  WrapFunctor b = WrapFunctor (a <*  b)
 
 instance Alternative f => Alternative (WrappedFunctor f) where
   empty = WrapFunctor empty
-  WrapFunctor x <|> WrapFunctor y = WrapFunctor $ x <|> y
+  WrapFunctor x <|> WrapFunctor y = WrapFunctor (x <|> y)
+  some = WrapFunctor . some . unwrapFunctor
+  many = WrapFunctor . many . unwrapFunctor
 
 instance Monad m => Monad (WrappedFunctor m) where
   return = WrapFunctor . return
-  WrapFunctor x >>= f = WrapFunctor $ x >>= unwrapFunctor . f
+  WrapFunctor x >>= f = WrapFunctor (x >>= unwrapFunctor . f)
+  WrapFunctor a >> WrapFunctor b = WrapFunctor (a >> b)
 
 instance MonadPlus m => MonadPlus (WrappedFunctor m) where
   mzero = WrapFunctor mzero
-  WrapFunctor x `mplus` WrapFunctor y = WrapFunctor $ x `mplus` y
+  WrapFunctor x `mplus` WrapFunctor y = WrapFunctor (x `mplus` y)
 
 instance F.Foldable f => F.Foldable (WrappedFunctor f) where
   fold       = F.fold       . unwrapFunctor
@@ -545,6 +555,7 @@ instance Contravariant f => Invariant (WrappedContravariant f) where
 
 instance Contravariant f => Contravariant (WrappedContravariant f) where
   contramap f = WrapContravariant . contramap f . unwrapContravariant
+  x >$ WrapContravariant f = WrapContravariant (x >$ f)
 
 instance Divisible f => Divisible (WrappedContravariant f) where
   divide f (WrapContravariant l) (WrapContravariant r) =
@@ -712,6 +723,10 @@ instance Profunctor p => Invariant (WrappedProfunctor p a) where
 
 instance Profunctor p => Profunctor (WrappedProfunctor p) where
   dimap f g = WrapProfunctor . dimap f g . unwrapProfunctor
+  lmap f    = WrapProfunctor . lmap f    . unwrapProfunctor
+  rmap g    = WrapProfunctor . rmap g    . unwrapProfunctor
+  WrapProfunctor x .# f = WrapProfunctor (x .# f)
+  g #. WrapProfunctor x = WrapProfunctor (g #. x)
 
 instance Strong p => Strong (WrappedProfunctor p) where
   first'  = WrapProfunctor . first'  . unwrapProfunctor
