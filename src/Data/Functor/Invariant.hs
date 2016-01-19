@@ -6,6 +6,8 @@
 #if GHC_GENERICS_OK
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 #endif
 
 #if __GLASGOW_HASKELL__ >= 706
@@ -48,7 +50,7 @@ module Data.Functor.Invariant
 
 -- base
 import qualified Control.Category as Cat
-import           Control.Arrow
+import           Control.Arrow hiding (first)
 import           Control.Applicative as App
 import           Control.Exception (Handler(..))
 import           Control.Monad (MonadPlus(..), liftM)
@@ -77,14 +79,15 @@ import           Text.ParserCombinators.ReadPrec (ReadPrec)
 import           Data.Array (Array)
 
 -- bifunctors
-import           Data.Bifunctor hiding (first)
+import           Data.Bifunctor
 import           Data.Bifunctor.Biff
 import           Data.Bifunctor.Clown
 import           Data.Bifunctor.Fix
 import           Data.Bifunctor.Flip
 import           Data.Bifunctor.Join
 import           Data.Bifunctor.Joker
-import qualified Data.Bifunctor.Product as Bifunctors
+import qualified Data.Bifunctor.Product as Bifunctor
+import qualified Data.Bifunctor.Sum as Bifunctor
 import           Data.Bifunctor.Tannen
 import           Data.Bifunctor.Wrapped
 
@@ -102,19 +105,24 @@ import           Data.Functor.Contravariant.Divisible
 -- profunctors
 import           Data.Profunctor as Pro
 import           Data.Profunctor.Cayley
+import           Data.Profunctor.Choice
 import           Data.Profunctor.Closed
-import           Data.Profunctor.Codensity
 import           Data.Profunctor.Composition
+import           Data.Profunctor.Mapping
 import           Data.Profunctor.Monad
 import           Data.Profunctor.Rep
 import           Data.Profunctor.Ran
-import           Data.Profunctor.Tambara
+import           Data.Profunctor.Strong
+import           Data.Profunctor.Traversing
 import           Data.Profunctor.Unsafe
 
 -- semigroups
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Semigroup as Semigroup (First(..), Last(..), Option(..))
 import           Data.Semigroup (Min(..), Max(..), Arg(..))
+
+-- StateVar
+import           Data.StateVar (StateVar(..), SettableStateVar(..))
 
 -- stm
 import           Control.Concurrent.STM (STM)
@@ -281,7 +289,7 @@ instance Invariant2 p => Invariant (Join p) where
   invmap f g = Join . invmap2 f g f g . runJoin
 -- | from the @bifunctors@ package
 instance Invariant g => Invariant (Joker g a) where
-  invmap = invmap2 id id
+  invmap f g = Joker . invmap f g . runJoker
 -- | from the @bifunctors@ package
 instance (Invariant f, Invariant2 p) => Invariant (Tannen f p a) where
   invmap = invmap2 id id
@@ -364,7 +372,13 @@ instance Invariant2 q => Invariant (Ran p q a) where
 instance Invariant2 p => Invariant (Tambara p a) where
   invmap = invmap2 id id
 -- | from the @profunctors@ package
-instance Invariant2 p => Invariant (Cotambara p a) where
+instance Invariant (Cotambara p a) where
+  invmap = invmapFunctor
+-- | from the @profunctors@ package
+instance Invariant (CotambaraSum p a) where
+  invmap = invmapFunctor
+-- | from the @profunctors@ package
+instance Invariant2 p => Invariant (TambaraSum p a) where
   invmap = invmap2 id id
 
 -- | from the @semigroups@ package
@@ -388,6 +402,13 @@ instance Invariant Semigroup.Option where
 -- | from the @semigroups@ package
 instance Invariant (Arg a) where
   invmap = invmapFunctor
+
+-- | from the @StateVar@ package
+instance Invariant StateVar where
+  invmap f g (StateVar ga sa) = StateVar (fmap f ga) (lmap g sa)
+-- | from the @StateVar@ package
+instance Invariant SettableStateVar where
+  invmap = invmapContravariant
 
 -- | from the @stm@ package
 instance Invariant STM where
@@ -626,9 +647,13 @@ instance Invariant2 p => Invariant2 (Flip p) where
 instance Invariant g => Invariant2 (Joker g) where
   invmap2 _ _ g g' = Joker . invmap g g' . runJoker
 -- | from the @bifunctors@ package
-instance (Invariant2 f, Invariant2 g) => Invariant2 (Bifunctors.Product f g) where
-  invmap2 f f' g g' (Bifunctors.Pair x y) =
-    Bifunctors.Pair (invmap2 f f' g g' x) (invmap2 f f' g g' y)
+instance (Invariant2 f, Invariant2 g) => Invariant2 (Bifunctor.Product f g) where
+  invmap2 f f' g g' (Bifunctor.Pair x y) =
+    Bifunctor.Pair (invmap2 f f' g g' x) (invmap2 f f' g g' y)
+-- | from the @bifunctors@ package
+instance (Invariant2 p, Invariant2 q) => Invariant2 (Bifunctor.Sum p q) where
+  invmap2 f f' g g' (Bifunctor.L2 l) = Bifunctor.L2 (invmap2 f f' g g' l)
+  invmap2 f f' g g' (Bifunctor.R2 r) = Bifunctor.R2 (invmap2 f f' g g' r)
 -- | from the @bifunctors@ package
 instance (Invariant f, Invariant2 p) => Invariant2 (Tannen f p) where
   invmap2 f f' g g' =
@@ -662,7 +687,7 @@ instance Invariant2 p => Invariant2 (Closure p) where
   invmap2 f f' g g' (Closure p) = Closure $ invmap2 (f .) (f' .) (g .) (g' .) p
 -- | from the @profunctors@ package
 instance Invariant2 (Environment p) where
-  invmap2 _ f' g _ (Environment l m r) = Environment (g . l) m (r . f')
+  invmap2 = invmap2Profunctor
 -- | from the @profunctors@ package
 instance Invariant2 p => Invariant2 (Codensity p) where
   invmap2 ac ca bd db (Codensity f) =
@@ -682,15 +707,38 @@ instance Invariant2 p => Invariant2 (Tambara p) where
   invmap2 f f' g g' (Tambara p) =
     Tambara $ invmap2 (first f) (first f') (first g) (first g') p
 -- | from the @profunctors@ package
+instance Invariant2 (PastroSum p) where
+  invmap2 = invmap2Profunctor
+-- | from the @profunctors@ package
+instance Invariant2 p => Invariant2 (CofreeMapping p) where
+  invmap2 f f' g g' (CofreeMapping p) =
+    CofreeMapping (invmap2 (fmap f) (fmap f') (fmap g) (fmap g') p)
+-- | from the @profunctors@ package
+instance Invariant2 (FreeMapping p) where
+  invmap2 = invmap2Profunctor
+-- | from the @profunctors@ package
+instance Invariant2 p => Invariant2 (CofreeTraversing p) where
+  invmap2 f f' g g' (CofreeTraversing p) =
+    CofreeTraversing (invmap2 (fmap f) (fmap f') (fmap g) (fmap g') p)
+-- | from the @profunctors@ package
+instance Invariant2 (FreeTraversing p) where
+  invmap2 = invmap2Profunctor
+-- | from the @profunctors@ package
 instance Invariant2 (Pastro p) where
-  invmap2 _ f' g _ (Pastro l m r) = Pastro (g . l) m (r . f')
+  invmap2 = invmap2Profunctor
 -- | from the @profunctors@ package
-instance Invariant2 p => Invariant2 (Cotambara p) where
-  invmap2 f f' g g' (Cotambara p) =
-    Cotambara $ invmap2 (left f) (left f') (left g) (left g') p
+instance Invariant2 (Cotambara p) where
+  invmap2 = invmap2Profunctor
 -- | from the @profunctors@ package
-instance Invariant2 (Copastro p) where
-  invmap2 _ f' g _ (Copastro l m r) = Copastro (g . l) m (r . f')
+instance Invariant2 (CopastroSum p) where
+  invmap2 = invmap2Profunctor
+-- | from the @profunctors@ package
+instance Invariant2 (CotambaraSum p) where
+  invmap2 = invmap2Profunctor
+-- | from the @profunctors@ package
+instance Invariant2 p => Invariant2 (TambaraSum p) where
+  invmap2 f f' g g' (TambaraSum p) =
+    TambaraSum (invmap2 (first f) (first f') (first g) (first g') p)
 
 -- | from the @semigroups@ package
 instance Invariant2 Arg where
@@ -744,6 +792,13 @@ instance Cochoice p => Cochoice (WrappedProfunctor p) where
 instance Closed p => Closed (WrappedProfunctor p) where
   closed = WrapProfunctor . closed . unwrapProfunctor
 
+instance Traversing p => Traversing (WrappedProfunctor p) where
+  traverse' = WrapProfunctor . traverse' . unwrapProfunctor
+  wander f  = WrapProfunctor . wander f  . unwrapProfunctor
+
+instance Mapping p => Mapping (WrappedProfunctor p) where
+  map' = WrapProfunctor . map' . unwrapProfunctor
+
 instance ProfunctorFunctor WrappedProfunctor where
   promap f = WrapProfunctor . f . unwrapProfunctor
 
@@ -787,6 +842,26 @@ instance Invariant f => Invariant (Rec1 f) where invmap f g (Rec1 fp) = Rec1 $ i
 -- likely requires writing your 'Generic1' instance by hand
 instance (Invariant f, Invariant g) => Invariant ((:.:) f g) where
   invmap f g (Comp1 fgp) = Comp1 $ invmap (invmap f g) (invmap g f) fgp
+
+# if __GLASGOW_HASKELL__ >= 800
+instance Invariant UAddr where
+  invmap _ _ (UAddr a) = UAddr a
+
+instance Invariant UChar where
+  invmap _ _ (UChar c) = UChar c
+
+instance Invariant UDouble where
+  invmap _ _ (UDouble d) = UDouble d
+
+instance Invariant UFloat where
+  invmap _ _ (UFloat f) = UFloat f
+
+instance Invariant UInt where
+  invmap _ _ (UInt i) = UInt i
+
+instance Invariant UWord where
+  invmap _ _ (UWord w) = UWord w
+# endif
 
 {- $ghcgenerics
 With GHC 7.2 or later, 'Invariant' instances can be defined easily using GHC

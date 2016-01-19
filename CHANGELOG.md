@@ -1,7 +1,12 @@
-# next
-* Add `Invariant` instance for `Fix` (added in `bifunctors-5.1`)
-* Add `Invariant` instances for `Prep` and `Coprep` (added in `profunctors-5.1.2`)
-* Add `ProfunctorFunctor`, `ProfunctorMonad`, and `ProfunctorComonad` instances for `WrappedProfunctor`
+# 0.2.3
+* Require `bifunctors-5.2` and `profunctors-5.2`. Add `Invariant(2)` instances
+  for newly introduced datatypes from those packages.
+* Add `ProfunctorFunctor`, `ProfunctorMonad`, `ProfunctorComonad`, `Mapping`,
+  and `Traversing` instances for `WrappedProfunctor`
+* Add `StateVar` as a dependency. Add `Invariant` instances for `StateVar` and
+  `SettableStateVar`.
+* Add `Invariant` instances for `URec` (added to `GHC.Generics` in
+  `base-4.9.0.0`)
 
 # 0.2.2
 * Add `genericInvmap` function (and make it the default implementation of
