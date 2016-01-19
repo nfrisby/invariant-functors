@@ -1,5 +1,5 @@
 name:                invariant
-version:             0.2.2
+version:             0.3
 synopsis:            Haskell 98 invariant functors
 description:         Haskell 98 invariant functors
 category:            Control, Data
@@ -47,7 +47,7 @@ library
                      , unordered-containers >= 0.2.4  && < 0.3
   ghc-options:         -Wall
 
-test-suite qc-tests
+test-suite spec
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
