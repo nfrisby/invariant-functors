@@ -447,12 +447,14 @@ instance Invariant m => Invariant (MaybeT m) where
 instance Invariant m => Invariant (Lazy.RWST r w s m) where
   invmap f g m = Lazy.RWST $ \r s ->
     invmap (mapFstTriple f) (mapFstTriple g) $ Lazy.runRWST m r s
-      where mapFstTriple h ~(a, s, w) = (h a, s, w)
+      where mapFstTriple :: (a -> b) -> (a, c, d) -> (b, c, d)
+            mapFstTriple h ~(a, s, w) = (h a, s, w)
 -- | from the @transformers@ package
 instance Invariant m => Invariant (Strict.RWST r w s m) where
   invmap f g m = Strict.RWST $ \r s ->
     invmap (mapFstTriple f) (mapFstTriple g) $ Strict.runRWST m r s
-      where mapFstTriple h (a, s, w) = (h a, s, w)
+      where mapFstTriple :: (a -> b) -> (a, c, d) -> (b, c, d)
+            mapFstTriple h (a, s, w) = (h a, s, w)
 -- | from the @transformers@ package
 instance Invariant m => Invariant (ReaderT r m) where
   invmap f g = mapReaderT (invmap f g)
@@ -460,20 +462,24 @@ instance Invariant m => Invariant (ReaderT r m) where
 instance Invariant m => Invariant (Lazy.StateT s m) where
   invmap f g m = Lazy.StateT $ \s ->
     invmap (mapFstPair f) (mapFstPair g) $ Lazy.runStateT m s
-      where mapFstPair h ~(a, s) = (h a, s)
+      where mapFstPair :: (a -> b) -> (a, c) -> (b, c)
+            mapFstPair h ~(a, s) = (h a, s)
 -- | from the @transformers@ package
 instance Invariant m => Invariant (Strict.StateT s m) where
   invmap f g m = Strict.StateT $ \s ->
     invmap (mapFstPair f) (mapFstPair g) $ Strict.runStateT m s
-      where mapFstPair h (a, s) = (h a, s)
+      where mapFstPair :: (a -> b) -> (a, c) -> (b, c)
+            mapFstPair h (a, s) = (h a, s)
 -- | from the @transformers@ package
 instance Invariant m => Invariant (Lazy.WriterT w m) where
   invmap f g = Lazy.mapWriterT $ invmap (mapFstPair f) (mapFstPair g)
-    where mapFstPair h ~(a, w) = (h a, w)
+    where mapFstPair :: (a -> b) -> (a, c) -> (b, c)
+          mapFstPair h ~(a, w) = (h a, w)
 -- | from the @transformers@ package
 instance Invariant m => Invariant (Strict.WriterT w m) where
   invmap f g = Strict.mapWriterT $ invmap (mapFstPair f) (mapFstPair g)
-    where mapFstPair h (a, w) = (h a, w)
+    where mapFstPair :: (a -> b) -> (a, c) -> (b, c)
+          mapFstPair h (a, w) = (h a, w)
 -- | from the @transformers@ package
 instance (Invariant f, Invariant g) => Invariant (Transformers.Compose f g) where
   invmap f g (Transformers.Compose x) =
