@@ -1,3 +1,7 @@
+# 0.3.1
+* Add `Invariant` instances for `Data.Complex.Complex`, `Data.Monoid.Product`,
+  and `Data.Monoid.Sum`
+
 # 0.3
 * Require `bifunctors-5.2` and `profunctors-5.2`. Add `Invariant(2)` instances
   for newly introduced datatypes from those packages.
