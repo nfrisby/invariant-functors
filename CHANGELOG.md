@@ -1,4 +1,7 @@
 # 0.3.1
+* Rewrote `Data.Functor.Invariant.TH`'s type inferencer. This avoids a nasty
+  GHC 7.8-specific bug involving derived `Invariant(2)` instances for data
+  families.
 * Add `Invariant` instances for `Data.Complex.Complex`, `Data.Monoid.Product`,
   and `Data.Monoid.Sum`
 
