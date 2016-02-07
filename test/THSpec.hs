@@ -8,6 +8,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
+#if __GLASGOW_HASKELL__ >= 800
+{-# OPTIONS_GHC -fno-warn-unused-foralls #-}
+#endif
 module THSpec (main, spec) where
 
 import Data.Functor.Invariant
