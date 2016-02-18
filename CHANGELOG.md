@@ -1,3 +1,7 @@
+## next
+* Add `Invariant` and `Invariant2` instances for `Kleisli` and `Cokleisli`
+* Add `Category` and `Arrow`-like instances for `WrappedProfunctor`
+
 # 0.3.1
 * Rewrote `Data.Functor.Invariant.TH`'s type inferencer. This avoids a nasty
   GHC 7.8-specific bug involving derived `Invariant(2)` instances for data

@@ -49,9 +49,10 @@ module Data.Functor.Invariant
   ) where
 
 -- base
-import qualified Control.Category as Cat
-import           Control.Arrow hiding (first)
 import           Control.Applicative as App
+import qualified Control.Arrow as Arr
+import           Control.Arrow hiding (first, second)
+import qualified Control.Category as Cat
 import           Control.Exception (Handler(..))
 import           Control.Monad (MonadPlus(..), liftM)
 import qualified Control.Monad.ST as Strict (ST)
@@ -99,6 +100,9 @@ import qualified Data.Bifunctor.Product as Bifunctor
 import qualified Data.Bifunctor.Sum as Bifunctor
 import           Data.Bifunctor.Tannen
 import           Data.Bifunctor.Wrapped
+
+-- comonad
+import           Control.Comonad (Comonad(..), Cokleisli(..), liftW)
 
 -- containers
 import           Data.IntMap (IntMap)
@@ -221,6 +225,9 @@ instance
 #endif
   => Invariant (ArrowMonad a) where
   invmap f _ (ArrowMonad m) = ArrowMonad (m >>> arr f)
+-- | from "Control.Arrow"
+instance Monad m => Invariant (Kleisli m a) where
+  invmap = invmap2 id id
 
 -- | from "Control.Exception"
 instance Invariant Handler where
@@ -347,6 +354,10 @@ instance (Invariant f, Invariant2 p) => Invariant (Tannen f p a) where
 -- | from the @bifunctors@ package
 instance Bifunctor p => Invariant (WrappedBifunctor p a) where
   invmap = invmap2 id id
+
+-- | from the @comonad@ package
+instance Invariant (Cokleisli w a) where
+  invmap = invmapFunctor
 
 -- | from the @containers@ package
 instance Invariant IntMap where
@@ -657,6 +668,10 @@ instance Invariant2 Const where invmap2 = invmap2Bifunctor
 instance Arrow arr => Invariant2 (App.WrappedArrow arr) where
   invmap2 _ f' g _ (App.WrapArrow x) = App.WrapArrow $ arr g Cat.. x Cat.. arr f'
 
+-- | from "Control.Arrow"
+instance Monad m => Invariant2 (Kleisli m) where
+  invmap2 _ f' g _ (Kleisli m) = Kleisli $ liftM g . m . f'
+
 -- | from "Data.Semigroup"
 instance Invariant2 Arg where
   invmap2 = invmap2Bifunctor
@@ -689,6 +704,10 @@ instance (Invariant f, Invariant2 p) => Invariant2 (Tannen f p) where
 -- | from the @bifunctors@ package
 instance Bifunctor p => Invariant2 (WrappedBifunctor p) where
   invmap2 = invmap2Bifunctor
+
+-- | from the @comonad@ package
+instance Comonad w => Invariant2 (Cokleisli w) where
+   invmap2 _ f' g _ (Cokleisli w) = Cokleisli $ g . w . liftW f'
 
 -- | from the @contravariant@ package
 instance Invariant2 Op where
@@ -796,6 +815,32 @@ instance Profunctor p => Profunctor (WrappedProfunctor p) where
   rmap g    = WrapProfunctor . rmap g    . unwrapProfunctor
   WrapProfunctor x .# f = WrapProfunctor (x .# f)
   g #. WrapProfunctor x = WrapProfunctor (g #. x)
+
+instance Cat.Category p => Cat.Category (WrappedProfunctor p) where
+  id = WrapProfunctor Cat.id
+  WrapProfunctor p1 . WrapProfunctor p2 = WrapProfunctor (p1 Cat.. p2)
+
+instance Arrow p => Arrow (WrappedProfunctor p) where
+  arr    = WrapProfunctor . arr
+  first  = WrapProfunctor . Arr.first  . unwrapProfunctor
+  second = WrapProfunctor . Arr.second . unwrapProfunctor
+  WrapProfunctor p1 *** WrapProfunctor p2 = WrapProfunctor (p1 *** p2)
+  WrapProfunctor p1 &&& WrapProfunctor p2 = WrapProfunctor (p1 &&& p2)
+
+instance ArrowZero p => ArrowZero (WrappedProfunctor p) where
+  zeroArrow = WrapProfunctor zeroArrow
+
+instance ArrowPlus p => ArrowPlus (WrappedProfunctor p) where
+  WrapProfunctor p1 <+> WrapProfunctor p2 = WrapProfunctor (p1 <+> p2)
+
+instance ArrowChoice p => ArrowChoice (WrappedProfunctor p) where
+  left  = WrapProfunctor . left  . unwrapProfunctor
+  right = WrapProfunctor . right . unwrapProfunctor
+  WrapProfunctor p1 +++ WrapProfunctor p2 = WrapProfunctor (p1 +++ p2)
+  WrapProfunctor p1 ||| WrapProfunctor p2 = WrapProfunctor (p1 ||| p2)
+
+instance ArrowLoop p => ArrowLoop (WrappedProfunctor p) where
+  loop = WrapProfunctor . loop . unwrapProfunctor
 
 instance Strong p => Strong (WrappedProfunctor p) where
   first'  = WrapProfunctor . first'  . unwrapProfunctor
