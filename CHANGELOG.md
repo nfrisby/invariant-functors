@@ -1,4 +1,6 @@
-## next
+# next
+* Allow TH derivation of `Invariant(2)` instances for datatypes containing
+  unboxed tuple types
 * Add `Invariant` and `Invariant2` instances for `Kleisli` and `Cokleisli`
 * Add `Category` and `Arrow`-like instances for `WrappedProfunctor`
 

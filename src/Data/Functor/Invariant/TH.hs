@@ -345,37 +345,45 @@ makeInvmapForType iClass conName tvMap covariant ty =
         mentionsTyArgs :: Bool
         mentionsTyArgs = any (`mentionsName` tyVarNames) tyArgs
 
-        makeInvmapTuple :: Type -> Name -> Q Exp
-        makeInvmapTuple fieldTy fieldName =
+        makeInvmapTuple :: ([Q Pat] -> Q Pat) -> ([Q Exp] -> Q Exp) -> Int -> Q Exp
+        makeInvmapTuple mkTupP mkTupE n = do
+            x  <- newName "x"
+            xs <- newNameList "x" n
+            lamE [varP x] $ caseE (varE x)
+                [ match (mkTupP $ map varP xs)
+                        (normalB . mkTupE $ zipWith makeInvmapTupleField tyArgs xs)
+                        []
+                ]
+
+        makeInvmapTupleField :: Type -> Name -> Q Exp
+        makeInvmapTupleField fieldTy fieldName =
             appE (makeInvmapForType iClass conName tvMap covariant fieldTy) $ varE fieldName
 
      in case tyCon of
-             ArrowT | mentionsTyArgs ->
-                 let [argTy, resTy] = tyArgs
-                  in do x <- newName "x"
-                        b <- newName "b"
-                        lamE [varP x, varP b] $
-                          makeInvmapForType iClass conName tvMap covariant resTy `appE` (varE x `appE`
-                            (makeInvmapForType iClass conName tvMap (not covariant) argTy `appE` varE b))
-             TupleT n | n > 0 && mentionsTyArgs -> do
-                 x  <- newName "x"
-                 xs <- newNameList "x" n
-                 lamE [varP x] $ caseE (varE x)
-                     [ match (tupP $ map varP xs)
-                             (normalB . tupE $ zipWith makeInvmapTuple tyArgs xs)
-                             []
-                     ]
-             _ -> do
-                 itf <- isTyFamily tyCon
-                 if any (`mentionsName` tyVarNames) lhsArgs || (itf && mentionsTyArgs)
-                      then outOfPlaceTyVarError conName tyVarNames
-                      else if any (`mentionsName` tyVarNames) rhsArgs
-                           then appsE $
-                                ( varE (invmapName (toEnum numLastArgs))
-                                : doubleMap (makeInvmapForType iClass conName tvMap) rhsArgs
-                                )
-                           else do x <- newName "x"
-                                   lamE [varP x] $ varE x
+          ArrowT | mentionsTyArgs ->
+              let [argTy, resTy] = tyArgs
+               in do x <- newName "x"
+                     b <- newName "b"
+                     lamE [varP x, varP b] $
+                       makeInvmapForType iClass conName tvMap covariant resTy `appE` (varE x `appE`
+                         (makeInvmapForType iClass conName tvMap (not covariant) argTy `appE` varE b))
+#if MIN_VERSION_template_haskell(2,6,0)
+          UnboxedTupleT n
+            | n > 0 && mentionsTyArgs -> makeInvmapTuple unboxedTupP unboxedTupE n
+#endif
+          TupleT n
+            | n > 0 && mentionsTyArgs -> makeInvmapTuple tupP tupE n
+          _ -> do
+              itf <- isTyFamily tyCon
+              if any (`mentionsName` tyVarNames) lhsArgs || (itf && mentionsTyArgs)
+                   then outOfPlaceTyVarError conName tyVarNames
+                   else if any (`mentionsName` tyVarNames) rhsArgs
+                        then appsE $
+                             ( varE (invmapName (toEnum numLastArgs))
+                             : doubleMap (makeInvmapForType iClass conName tvMap) rhsArgs
+                             )
+                        else do x <- newName "x"
+                                lamE [varP x] $ varE x
 
 -------------------------------------------------------------------------------
 -- Template Haskell reifying and AST manipulation
