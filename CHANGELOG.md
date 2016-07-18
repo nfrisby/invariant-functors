@@ -1,6 +1,8 @@
 # next
 * Allow TH derivation of `Invariant(2)` instances for datatypes containing
   unboxed tuple types
+* Ensure `Invariant(2)` instances are in-scope when importing
+  `Data.Functor.Invariant`
 * Add `Invariant` and `Invariant2` instances for `Kleisli` and `Cokleisli`
 * Add `Category` and `Arrow`-like instances for `WrappedProfunctor`
 

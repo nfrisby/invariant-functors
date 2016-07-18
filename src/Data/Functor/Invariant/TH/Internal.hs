@@ -14,6 +14,7 @@ module Data.Functor.Invariant.TH.Internal where
 import           Control.Monad (liftM)
 
 import           Data.Foldable (foldr')
+import           Data.Functor.Invariant () -- To import the instances
 import           Data.List
 import qualified Data.Map as Map (fromList, findWithDefault, singleton)
 import           Data.Map (Map)
