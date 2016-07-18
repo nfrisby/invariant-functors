@@ -1,4 +1,4 @@
-# next
+# 0.4
 * Allow TH derivation of `Invariant(2)` instances for datatypes containing
   unboxed tuple types
 * Ensure `Invariant(2)` instances are in-scope when importing

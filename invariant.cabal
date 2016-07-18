@@ -1,5 +1,5 @@
 name:                invariant
-version:             0.3.1
+version:             0.4
 synopsis:            Haskell 98 invariant functors
 description:         Haskell 98 invariant functors
 category:            Control, Data
