@@ -887,7 +887,7 @@ instance ProfunctorComonad WrappedProfunctor where
 -- | from "GHC.Generics"
 instance Invariant V1 where
   -- NSF 25 July 2015: I'd prefer an -XEmptyCase, but Haskell98.
-  invmap _ _ _ = error "Invariant V1"
+  invmap _ _ x = x `seq` error "Invariant V1"
 -- | from "GHC.Generics"
 instance Invariant U1 where invmap _ _ _ = U1
 -- | from "GHC.Generics"
@@ -912,21 +912,27 @@ instance (Invariant f, Invariant g) => Invariant ((:.:) f g) where
   invmap f g (Comp1 fgp) = Comp1 $ invmap (invmap f g) (invmap g f) fgp
 
 # if __GLASGOW_HASKELL__ >= 800
+-- | from "GHC.Generics"
 instance Invariant UAddr where
   invmap _ _ (UAddr a) = UAddr a
 
+-- | from "GHC.Generics"
 instance Invariant UChar where
   invmap _ _ (UChar c) = UChar c
 
+-- | from "GHC.Generics"
 instance Invariant UDouble where
   invmap _ _ (UDouble d) = UDouble d
 
+-- | from "GHC.Generics"
 instance Invariant UFloat where
   invmap _ _ (UFloat f) = UFloat f
 
+-- | from "GHC.Generics"
 instance Invariant UInt where
   invmap _ _ (UInt i) = UInt i
 
+-- | from "GHC.Generics"
 instance Invariant UWord where
   invmap _ _ (UWord w) = UWord w
 # endif

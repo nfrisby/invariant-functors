@@ -1,3 +1,6 @@
+# next
+* Fix the `Invariant V1` instance so as to `seq` its argument
+
 # 0.4
 * Allow TH derivation of `Invariant(2)` instances for datatypes containing
   unboxed tuple types
