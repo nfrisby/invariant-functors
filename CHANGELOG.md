@@ -1,4 +1,4 @@
-# next
+# 0.4.1
 * Fix the `Invariant V1` instance so as to `seq` its argument
 * Allow building with `template-haskell-2.12`
 
