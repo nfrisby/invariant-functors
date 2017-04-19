@@ -1,7 +1,11 @@
 name:                invariant
 version:             0.4.1
-synopsis:            Haskell 98 invariant functors
-description:         Haskell 98 invariant functors
+synopsis:            Haskell98 invariant functors
+description:         Haskell98 invariant functors (also known as exponential functors).
+                     .
+                     For more information, see Edward Kmett's article \"Rotten Bananas\":
+                     .
+                     <http://comonad.com/reader/2008/rotten-bananas/>
 category:            Control, Data
 license:             BSD3
 license-file:        LICENSE
