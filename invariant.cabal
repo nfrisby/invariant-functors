@@ -1,5 +1,5 @@
 name:                invariant
-version:             0.4.1
+version:             0.4.2
 synopsis:            Haskell98 invariant functors
 description:         Haskell98 invariant functors (also known as exponential functors).
                      .

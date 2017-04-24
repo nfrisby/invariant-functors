@@ -1,3 +1,7 @@
+# 0.4.2 [2017.04.24]
+* `invariant.cabal` used to incorrectly state the license was BSD3 when it was
+  in fact BSD2. This is now fixed.
+
 # 0.4.1
 * Fix the `Invariant V1` instance so as to `seq` its argument
 * Allow building with `template-haskell-2.12`
