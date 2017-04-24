@@ -7,7 +7,7 @@ description:         Haskell98 invariant functors (also known as exponential fun
                      .
                      <http://comonad.com/reader/2008/rotten-bananas/>
 category:            Control, Data
-license:             BSD3
+license:             BSD2
 license-file:        LICENSE
 homepage:            https://github.com/nfrisby/invariant-functors
 bug-reports:         https://github.com/nfrisby/invariant-functors/issues
