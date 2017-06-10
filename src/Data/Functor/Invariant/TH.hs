@@ -230,9 +230,9 @@ deriveInvariantClass iClass name = do
                  } -> do
       (instanceCxt, instanceType)
         <- buildTypeInstance iClass parentName ctxt vars variant
-      (:[]) <$> instanceD (return instanceCxt)
-                          (return instanceType)
-                          (invmapDecs iClass vars cons)
+      (:[]) `fmap` instanceD (return instanceCxt)
+                             (return instanceType)
+                             (invmapDecs iClass vars cons)
 
 -- | Generates a declaration defining the primary function corresponding to a
 -- particular class (invmap for Invariant and invmap2 for Invariant2).
