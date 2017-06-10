@@ -25,9 +25,6 @@ module Data.Functor.Invariant.TH (
 
 import           Control.Monad (unless, when)
 
-#if MIN_VERSION_template_haskell(2,8,0) && !(MIN_VERSION_template_haskell(2,10,0))
-import           Data.Foldable (foldr')
-#endif
 import           Data.Functor.Invariant.TH.Internal
 import           Data.List
 import qualified Data.Map as Map (fromList, keys, lookup, size)
@@ -666,15 +663,3 @@ etaReductionError :: Type -> a
 etaReductionError instanceType = error $
     "Cannot eta-reduce to an instance of form \n\tinstance (...) => "
     ++ pprint instanceType
-
-#if !(MIN_VERSION_template_haskell(2,7,0))
--- | Template Haskell didn't list all of a data family's instances upon reification
--- until template-haskell-2.7.0.0, which is necessary for a derived Invariant instance
--- to work.
-dataConIError :: a
-dataConIError = error
-    . showString "Cannot use a data constructor."
-    . showString "\n\t(Note: if you are trying to derive Invariant for a type family,"
-    . showString "\n\tuse GHC >= 7.4 instead.)"
-    $ ""
-#endif
