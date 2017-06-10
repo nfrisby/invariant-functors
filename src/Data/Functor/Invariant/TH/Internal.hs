@@ -14,7 +14,7 @@ module Data.Functor.Invariant.TH.Internal where
 import           Data.Foldable (foldr')
 import           Data.Functor.Invariant () -- To import the instances
 import           Data.List
-import qualified Data.Map as Map (findWithDefault, singleton)
+import qualified Data.Map as Map (singleton)
 import           Data.Map (Map)
 import           Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Set as Set
