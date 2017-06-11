@@ -25,14 +25,12 @@ module Data.Functor.Invariant.TH (
 
 import           Control.Monad (unless, when)
 
-#if MIN_VERSION_template_haskell(2,8,0) && !(MIN_VERSION_template_haskell(2,10,0))
-import           Data.Foldable (foldr')
-#endif
 import           Data.Functor.Invariant.TH.Internal
 import           Data.List
 import qualified Data.Map as Map (fromList, keys, lookup, size)
 import           Data.Maybe
 
+import           Language.Haskell.TH.Datatype
 import           Language.Haskell.TH.Lib
 import           Language.Haskell.TH.Ppr
 import           Language.Haskell.TH.Syntax
@@ -218,23 +216,28 @@ makeInvmap2 = makeInvmapClass Invariant2
 -- | Derive an Invariant(2) instance declaration (depending on the InvariantClass
 -- argument's value).
 deriveInvariantClass :: InvariantClass -> Name -> Q [Dec]
-deriveInvariantClass iClass name = withType name fromCons
-  where
-    fromCons :: Name -> Cxt -> [TyVarBndr] -> [Con] -> Maybe [Type] -> Q [Dec]
-    fromCons name' ctxt tvbs cons mbTys = (:[]) `fmap` do
-        (instanceCxt, instanceType)
-            <- buildTypeInstance iClass name' ctxt tvbs mbTys
-        instanceD (return instanceCxt)
-                  (return instanceType)
-                  (invmapDecs iClass cons)
+deriveInvariantClass iClass name = do
+  info <- reifyDatatype name
+  case info of
+    DatatypeInfo { datatypeContext = ctxt
+                 , datatypeName    = parentName
+                 , datatypeVars    = vars
+                 , datatypeVariant = variant
+                 , datatypeCons    = cons
+                 } -> do
+      (instanceCxt, instanceType)
+        <- buildTypeInstance iClass parentName ctxt vars variant
+      (:[]) `fmap` instanceD (return instanceCxt)
+                             (return instanceType)
+                             (invmapDecs iClass vars cons)
 
 -- | Generates a declaration defining the primary function corresponding to a
 -- particular class (invmap for Invariant and invmap2 for Invariant2).
-invmapDecs :: InvariantClass -> [Con] -> [Q Dec]
-invmapDecs iClass cons =
+invmapDecs :: InvariantClass -> [Type] -> [ConstructorInfo] -> [Q Dec]
+invmapDecs iClass vars cons =
     [ funD (invmapName iClass)
            [ clause []
-                    (normalB $ makeInvmapForCons iClass cons)
+                    (normalB $ makeInvmapForCons iClass vars cons)
                     []
            ]
     ]
@@ -242,28 +245,35 @@ invmapDecs iClass cons =
 -- | Generates a lambda expression which behaves like invmap (for Invariant),
 -- or invmap2 (for Invariant2).
 makeInvmapClass :: InvariantClass -> Name -> Q Exp
-makeInvmapClass iClass name = withType name fromCons
-  where
-    fromCons :: Name -> Cxt -> [TyVarBndr] -> [Con] -> Maybe [Type] -> Q Exp
-    fromCons name' ctxt tvbs cons mbTys =
-        -- We force buildTypeInstance here since it performs some checks for whether
-        -- or not the provided datatype can actually have invmap/invmap2
-        -- implemented for it, and produces errors if it can't.
-        buildTypeInstance iClass name' ctxt tvbs mbTys
-          `seq` makeInvmapForCons iClass cons
+makeInvmapClass iClass name = do
+  info <- reifyDatatype name
+  case info of
+    DatatypeInfo { datatypeContext = ctxt
+                 , datatypeName    = parentName
+                 , datatypeVars    = vars
+                 , datatypeVariant = variant
+                 , datatypeCons    = cons
+                 } ->
+      -- We force buildTypeInstance here since it performs some checks for whether
+      -- or not the provided datatype can actually have invmap/invmap2
+      -- implemented for it, and produces errors if it can't.
+      buildTypeInstance iClass parentName ctxt vars variant
+        `seq` makeInvmapForCons iClass vars cons
 
 -- | Generates a lambda expression for invmap(2) for the given constructors.
 -- All constructors must be from the same type.
-makeInvmapForCons :: InvariantClass -> [Con] -> Q Exp
-makeInvmapForCons iClass cons = do
+makeInvmapForCons :: InvariantClass -> [Type] -> [ConstructorInfo] -> Q Exp
+makeInvmapForCons iClass vars cons = do
     let numNbs = fromEnum iClass
 
     value      <- newName "value"
     covMaps    <- newNameList "covMap" numNbs
     contraMaps <- newNameList "contraMap" numNbs
 
-    let mapFuns  = zip covMaps contraMaps
-        argNames = concat (transpose [covMaps, contraMaps]) ++ [value]
+    let mapFuns    = zip covMaps contraMaps
+        lastTyVars = map varTToName $ drop (length vars - fromEnum iClass) vars
+        tvMap      = Map.fromList $ zip lastTyVars mapFuns
+        argNames   = concat (transpose [covMaps, contraMaps]) ++ [value]
     lamE (map varP argNames)
         . appsE
         $ [ varE $ invmapConstName iClass
@@ -271,23 +281,28 @@ makeInvmapForCons iClass cons = do
                then appE (varE errorValName)
                          (stringE $ "Void " ++ nameBase (invmapName iClass))
                else caseE (varE value)
-                          (map (makeInvmapForCon iClass mapFuns) cons)
+                          (map (makeInvmapForCon iClass tvMap) cons)
           ] ++ map varE argNames
 
 -- | Generates a lambda expression for invmap(2) for a single constructor.
-makeInvmapForCon :: InvariantClass -> [(Name, Name)] -> Con -> Q Match
-makeInvmapForCon iClass mapFuns con = do
-    let conName = constructorName con
-    (ts, tvMap) <- reifyConTys iClass conName mapFuns
-    argNames    <- newNameList "arg" $ length ts
-    makeInvmapForArgs iClass tvMap conName ts argNames
+makeInvmapForCon :: InvariantClass -> TyVarMap -> ConstructorInfo -> Q Match
+makeInvmapForCon iClass tvMap
+  (ConstructorInfo { constructorName    = conName
+                   , constructorContext = ctxt
+                   , constructorFields  = ts })= do
+    ts'      <- mapM resolveTypeSynonyms ts
+    argNames <- newNameList "arg" $ length ts'
+    if any (`predMentionsName` Map.keys tvMap) ctxt
+         || Map.size tvMap < fromEnum iClass
+       then existentialContextError conName
+       else makeInvmapForArgs iClass tvMap conName ts' argNames
 
 makeInvmapForArgs :: InvariantClass
                   -> TyVarMap
                   -> Name
                   -> [Type]
                   -> [Name]
-                  ->  Q Match
+                  -> Q Match
 makeInvmapForArgs iClass tvMap conName tys args =
     let mappedArgs :: [Q Exp]
         mappedArgs = zipWith (makeInvmapForArg iClass conName tvMap) tys args
@@ -389,197 +404,27 @@ makeInvmapForType iClass conName tvMap covariant ty =
 -- Template Haskell reifying and AST manipulation
 -------------------------------------------------------------------------------
 
--- | Extracts a plain type constructor's information.
--- | Boilerplate for top level splices.
---
--- The given Name must meet one of two criteria:
---
--- 1. It must be the name of a type constructor of a plain data type or newtype.
--- 2. It must be the name of a data family instance or newtype instance constructor.
---
--- Any other value will result in an exception.
-withType :: Name
-         -> (Name -> Cxt -> [TyVarBndr] -> [Con] -> Maybe [Type] -> Q a)
-         -> Q a
-withType name f = do
-  info <- reify name
-  case info of
-    TyConI dec ->
-      case dec of
-        DataD ctxt _ tvbs
-#if MIN_VERSION_template_haskell(2,11,0)
-              _
-#endif
-              cons _ -> f name ctxt tvbs cons Nothing
-        NewtypeD ctxt _ tvbs
-#if MIN_VERSION_template_haskell(2,11,0)
-                 _
-#endif
-                 con _ -> f name ctxt tvbs [con] Nothing
-        _ -> error $ ns ++ "Unsupported type: " ++ show dec
-#if MIN_VERSION_template_haskell(2,7,0)
-# if MIN_VERSION_template_haskell(2,11,0)
-    DataConI _ _ parentName   -> do
-# else
-    DataConI _ _ parentName _ -> do
-# endif
-      parentInfo <- reify parentName
-      case parentInfo of
-# if MIN_VERSION_template_haskell(2,11,0)
-        FamilyI (DataFamilyD _ tvbs _) decs ->
-# else
-        FamilyI (FamilyD DataFam _ tvbs _) decs ->
-# endif
-          let instDec = flip find decs $ \dec -> case dec of
-                DataInstD _ _ _
-# if MIN_VERSION_template_haskell(2,11,0)
-                          _
-# endif
-                          cons _ -> any ((name ==) . constructorName) cons
-                NewtypeInstD _ _ _
-# if MIN_VERSION_template_haskell(2,11,0)
-                             _
-# endif
-                             con _ -> name == constructorName con
-                _ -> error $ ns ++ "Must be a data or newtype instance."
-           in case instDec of
-                Just (DataInstD ctxt _ instTys
-# if MIN_VERSION_template_haskell(2,11,0)
-                                _
-# endif
-                                cons _)
-                  -> f parentName ctxt tvbs cons $ Just instTys
-                Just (NewtypeInstD ctxt _ instTys
-# if MIN_VERSION_template_haskell(2,11,0)
-                                   _
-# endif
-                                   con _)
-                  -> f parentName ctxt tvbs [con] $ Just instTys
-                _ -> error $ ns ++
-                  "Could not find data or newtype instance constructor."
-        _ -> error $ ns ++ "Data constructor " ++ show name ++
-          " is not from a data family instance constructor."
-# if MIN_VERSION_template_haskell(2,11,0)
-    FamilyI DataFamilyD{} _ ->
-# else
-    FamilyI (FamilyD DataFam _ _ _) _ ->
-# endif
-      error $ ns ++
-        "Cannot use a data family name. Use a data family instance constructor instead."
-    _ -> error $ ns ++ "The name must be of a plain data type constructor, "
-                    ++ "or a data family instance constructor."
-#else
-    DataConI{} -> dataConIError
-    _          -> error $ ns ++ "The name must be of a plain type constructor."
-#endif
-  where
-    ns :: String
-    ns = "Data.Functor.Invariant.TH.withType: "
-
--- | Deduces the instance context and head for an instance.
+-- For the given Types, generate an instance context and head. Coming up with
+-- the instance type isn't as simple as dropping the last types, as you need to
+-- be wary of kinds being instantiated with *.
+-- See Note [Type inference in derived instances]
 buildTypeInstance :: InvariantClass
                   -- ^ Invariant or Invariant2
                   -> Name
                   -- ^ The type constructor or data family name
                   -> Cxt
                   -- ^ The datatype context
-                  -> [TyVarBndr]
-                  -- ^ The type variables from the data type/data family declaration
-                  -> Maybe [Type]
-                  -- ^ 'Just' the types used to instantiate a data family instance,
-                  -- or 'Nothing' if it's a plain data type
+                  -> [Type]
+                  -- ^ The types to instantiate the instance with
+                  -> DatatypeVariant
+                  -- ^ Are we dealing with a data family instance or not
                   -> Q (Cxt, Type)
--- Plain data type/newtype case
-buildTypeInstance iClass tyConName dataCxt tvbs Nothing =
-    let varTys :: [Type]
-        varTys = map tvbToType tvbs
-    in buildTypeInstanceFromTys iClass tyConName dataCxt varTys False
--- Data family instance case
---
--- The CPP is present to work around a couple of annoying old GHC bugs.
--- See Note [Polykinded data families in Template Haskell]
-buildTypeInstance iClass parentName dataCxt tvbs (Just instTysAndKinds) = do
-#if !(MIN_VERSION_template_haskell(2,8,0)) || MIN_VERSION_template_haskell(2,10,0)
-    let instTys :: [Type]
-        instTys = zipWith stealKindForType tvbs instTysAndKinds
-#else
-    let kindVarNames :: [Name]
-        kindVarNames = nub $ concatMap (tyVarNamesOfType . tvbKind) tvbs
-
-        numKindVars :: Int
-        numKindVars = length kindVarNames
-
-        givenKinds, givenKinds' :: [Kind]
-        givenTys                :: [Type]
-        (givenKinds, givenTys) = splitAt numKindVars instTysAndKinds
-        givenKinds' = map sanitizeStars givenKinds
-
-        -- A GHC 7.6-specific bug requires us to replace all occurrences of
-        -- (ConT GHC.Prim.*) with StarT, or else Template Haskell will reject it.
-        -- Luckily, (ConT GHC.Prim.*) only seems to occur in this one spot.
-        sanitizeStars :: Kind -> Kind
-        sanitizeStars = go
-          where
-            go :: Kind -> Kind
-            go (AppT t1 t2)                 = AppT (go t1) (go t2)
-            go (SigT t k)                   = SigT (go t) (go k)
-            go (ConT n) | n == starKindName = StarT
-            go t                            = t
-
-    -- If we run this code with GHC 7.8, we might have to generate extra type
-    -- variables to compensate for any type variables that Template Haskell
-    -- eta-reduced away.
-    -- See Note [Polykinded data families in Template Haskell]
-    xTypeNames <- newNameList "tExtra" (length tvbs - length givenTys)
-
-    let xTys   :: [Type]
-        xTys = map VarT xTypeNames
-        -- ^ Because these type variables were eta-reduced away, we can only
-        --   determine their kind by using stealKindForType. Therefore, we mark
-        --   them as VarT to ensure they will be given an explicit kind annotation
-        --   (and so the kind inference machinery has the right information).
-
-        substNamesWithKinds :: [(Name, Kind)] -> Type -> Type
-        substNamesWithKinds nks t = foldr' (uncurry substNameWithKind) t nks
-
-        -- The types from the data family instance might not have explicit kind
-        -- annotations, which the kind machinery needs to work correctly. To
-        -- compensate, we use stealKindForType to explicitly annotate any
-        -- types without kind annotations.
-        instTys :: [Type]
-        instTys = map (substNamesWithKinds (zip kindVarNames givenKinds'))
-                  -- ^ Note that due to a GHC 7.8-specific bug
-                  --   (see Note [Polykinded data families in Template Haskell]),
-                  --   there may be more kind variable names than there are kinds
-                  --   to substitute. But this is OK! If a kind is eta-reduced, it
-                  --   means that is was not instantiated to something more specific,
-                  --   so we need not substitute it. Using stealKindForType will
-                  --   grab the correct kind.
-                $ zipWith stealKindForType tvbs (givenTys ++ xTys)
-#endif
-    buildTypeInstanceFromTys iClass parentName dataCxt instTys True
-
--- For the given Types, generate an instance context and head. Coming up with
--- the instance type isn't as simple as dropping the last types, as you need to
--- be wary of kinds being instantiated with *.
--- See Note [Type inference in derived instances]
-buildTypeInstanceFromTys :: InvariantClass
-                         -- ^ Invariant or Invariant2
-                         -> Name
-                         -- ^ The type constructor or data family name
-                         -> Cxt
-                         -- ^ The datatype context
-                         -> [Type]
-                         -- ^ The types to instantiate the instance with
-                         -> Bool
-                         -- ^ True if it's a data family, False otherwise
-                         -> Q (Cxt, Type)
-buildTypeInstanceFromTys iClass tyConName dataCxt varTysOrig isDataFamily = do
+buildTypeInstance iClass tyConName dataCxt varTysOrig variant = do
     -- Make sure to expand through type/kind synonyms! Otherwise, the
     -- eta-reduction check might get tripped up over type variables in a
     -- synonym that are actually dropped.
     -- (See GHC Trac #11416 for a scenario where this actually happened.)
-    varTysExp <- mapM expandSyn varTysOrig
+    varTysExp <- mapM resolveTypeSynonyms varTysOrig
 
     let remainingLength :: Int
         remainingLength = length varTysOrig - fromEnum iClass
@@ -609,7 +454,7 @@ buildTypeInstanceFromTys iClass tyConName dataCxt varTysOrig isDataFamily = do
         -- All of the type variables mentioned in the dropped types
         -- (post-synonym expansion)
         droppedTyVarNames :: [Name]
-        droppedTyVarNames = concatMap tyVarNamesOfType droppedTysExpSubst
+        droppedTyVarNames = freeVariables droppedTysExpSubst
 
     -- If any of the dropped types were polykinded, ensure that there are of kind *
     -- after substituting * for the dropped kind variables. If not, throw an error.
@@ -649,6 +494,13 @@ buildTypeInstanceFromTys iClass tyConName dataCxt varTysOrig isDataFamily = do
         remainingTysOrigSubst =
           map (substNamesWithKindStar (union droppedKindVarNames kvNames'))
             $ take remainingLength varTysOrig
+
+        isDataFamily :: Bool
+        isDataFamily = case variant of
+                         Datatype        -> False
+                         Newtype         -> False
+                         DataInstance    -> True
+                         NewtypeInstance -> True
 
         remainingTysOrigSubst' :: [Type]
         -- See Note [Kind signatures in derived instances] for an explanation
@@ -696,42 +548,6 @@ deriveConstraint iClass t
     tName = varTToName t
 
 {-
-Note [Polykinded data families in Template Haskell]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In order to come up with the correct instance context and head for an instance, e.g.,
-  instance C a => C (Data a) where ...
-We need to know the exact types and kinds used to instantiate the instance. For
-plain old datatypes, this is simple: every type must be a type variable, and
-Template Haskell reliably tells us the type variables and their kinds.
-Doing the same for data families proves to be much harder for three reasons:
-1. On any version of Template Haskell, it may not tell you what an instantiated
-   type's kind is. For instance, in the following data family instance:
-     data family Fam (f :: * -> *) (a :: *)
-     data instance Fam f a
-   Then if we use TH's reify function, it would tell us the TyVarBndrs of the
-   data family declaration are:
-     [KindedTV f (AppT (AppT ArrowT StarT) StarT),KindedTV a StarT]
-   and the instantiated types of the data family instance are:
-     [VarT f1,VarT a1]
-   We can't just pass [VarT f1,VarT a1] to buildTypeInstanceFromTys, since we
-   have no way of knowing their kinds. Luckily, the TyVarBndrs tell us what the
-   kind is in case an instantiated type isn't a SigT, so we use the stealKindForType
-   function to ensure all of the instantiated types are SigTs before passing them
-   to buildTypeInstanceFromTys.
-2. On GHC 7.6 and 7.8, a bug is present in which Template Haskell lists all of
-   the specified kinds of a data family instance efore any of the instantiated
-   types. Fortunately, this is easy to deal with: you simply count the number of
-   distinct kind variables in the data family declaration, take that many elements
-   from the front of the  Types list of the data family instance, substitute the
-   kind variables with their respective instantiated kinds (which you took earlier),
-   and proceed as normal.
-3. On GHC 7.8, an even uglier bug is present (GHC Trac #9692) in which Template
-   Haskell might not even list all of the Types of a data family instance, since
-   they are eta-reduced away! And yes, kinds can be eta-reduced too.
-   The simplest workaround is to count how many instantiated types are missing from
-   the list and generate extra type variables to use in their place. Luckily, we
-   needn't worry much if its kind was eta-reduced away, since using stealKindForType
-   will get it back.
 Note [Kind signatures in derived instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It is possible to put explicit kind signatures into the derived instances, e.g.,
@@ -786,43 +602,6 @@ things we can do to make instance contexts that work for 80% of use cases:
         * or kind variables), then generate a Invariant2 n constraint and perform
         kind substitution as in the other case.
 -}
-
--- Determines the types of a constructor's arguments as well as the last type
--- parameters (along with their map functions), expanding through any type synonyms.
--- The type parameters are determined on a constructor-by-constructor basis since
--- they may be refined to be particular types in a GADT.
-reifyConTys :: InvariantClass
-            -> Name
-            -> [(Name, Name)]
-            -> Q ([Type], TyVarMap)
-reifyConTys iClass conName maps = do
-    info          <- reify conName
-    (ctxt, uncTy) <- case info of
-        DataConI _ ty _
-#if !(MIN_VERSION_template_haskell(2,11,0))
-                 _
-#endif
-                 -> fmap uncurryTy (expandSyn ty)
-        _ -> error "Must be a data constructor"
-    let (argTys, [resTy]) = splitAt (length uncTy - 1) uncTy
-        unapResTy = unapplyTy resTy
-        numToDrop = fromEnum iClass
-        -- If one of the last type variables is refined to a particular type
-        -- (i.e., not truly polymorphic), we mark it with Nothing and filter
-        -- it out later, since we only apply map functions to arguments of
-        -- a type that is (1) one of the last type variables, and (2)
-        -- of a truly polymorphic type.
-        mbTvNames = map varTToName_maybe $
-                        drop (length unapResTy - numToDrop) unapResTy
-        tvMap = Map.fromList
-                    . catMaybes -- Drop refined types
-                    $ zipWith (\mbTvName mapFuns ->
-                                  fmap (\tvName -> (tvName, mapFuns)) mbTvName)
-                              mbTvNames maps
-    if any (`predMentionsName` Map.keys tvMap) ctxt
-         || Map.size tvMap < numToDrop
-       then existentialContextError conName
-       else return (argTys, tvMap)
 
 -------------------------------------------------------------------------------
 -- Error messages
@@ -884,15 +663,3 @@ etaReductionError :: Type -> a
 etaReductionError instanceType = error $
     "Cannot eta-reduce to an instance of form \n\tinstance (...) => "
     ++ pprint instanceType
-
-#if !(MIN_VERSION_template_haskell(2,7,0))
--- | Template Haskell didn't list all of a data family's instances upon reification
--- until template-haskell-2.7.0.0, which is necessary for a derived Invariant instance
--- to work.
-dataConIError :: a
-dataConIError = error
-    . showString "Cannot use a data constructor."
-    . showString "\n\t(Note: if you are trying to derive Invariant for a type family,"
-    . showString "\n\tuse GHC >= 7.4 instead.)"
-    $ ""
-#endif
