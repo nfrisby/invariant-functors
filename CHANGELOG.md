@@ -1,3 +1,6 @@
+# next [????.??.??]
+* Add `Invariant(2)` instances for `Data.Profunctor.Yoneda.Yoneda`.
+
 # 0.4.2 [2017.04.24]
 * `invariant.cabal` used to incorrectly state the license was BSD3 when it was
   in fact BSD2. This is now fixed.

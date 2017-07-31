@@ -128,6 +128,7 @@ import           Data.Profunctor.Ran
 import           Data.Profunctor.Strong
 import           Data.Profunctor.Traversing
 import           Data.Profunctor.Unsafe
+import           Data.Profunctor.Yoneda
 
 -- StateVar
 import           Data.StateVar (StateVar(..), SettableStateVar(..))
@@ -442,6 +443,9 @@ instance Invariant (CotambaraSum p a) where
 -- | from the @profunctors@ package
 instance Invariant2 p => Invariant (TambaraSum p a) where
   invmap = invmap2 id id
+-- | from the @profunctors@ package
+instance Invariant (Yoneda p a) where
+  invmap = invmapFunctor
 
 -- | from the @StateVar@ package
 instance Invariant StateVar where
@@ -786,6 +790,9 @@ instance Invariant2 (CotambaraSum p) where
 instance Invariant2 p => Invariant2 (TambaraSum p) where
   invmap2 f f' g g' (TambaraSum p) =
     TambaraSum (invmap2 (first f) (first f') (first g) (first g') p)
+-- | from the @profunctors@ package
+instance Invariant2 (Yoneda p) where
+  invmap2 = invmap2Profunctor
 
 -- | from the @tagged@ package
 instance Invariant2 Tagged where

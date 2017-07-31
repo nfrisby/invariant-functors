@@ -43,7 +43,7 @@ library
                      , containers           >= 0.1    && < 0.6
                      , contravariant        >= 0.5    && < 2
                      , ghc-prim
-                     , profunctors          >= 5.2    && < 6
+                     , profunctors          >= 5.2.1  && < 6
                      , semigroups           >= 0.16.2 && < 1
                      , StateVar             >= 1.1    && < 2
                      , stm                  >= 2.2    && < 3
