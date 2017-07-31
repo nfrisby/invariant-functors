@@ -1,4 +1,4 @@
-# next [????.??.??]
+# 0.4.3 [2017.07.31]
 * Add `Invariant(2)` instances for `Data.Profunctor.Yoneda.Yoneda`.
 
 # 0.4.2 [2017.04.24]
