@@ -1,7 +1,7 @@
 # next [????.??.??]
 * `Data.Functor.Invariant.TH` now derives `invmap(2)` implementations for empty
   data types that are strict in the argument.
-* Add `Options`  `Data.Functor.Invariant.TH`, along with variants of existing
+* Add `Options` to `Data.Functor.Invariant.TH`, along with variants of existing
   functions that take `Options` as an argument. For now, the only configurable
   option is whether derived instances for empty data types should use the
   `EmptyCase` extension (this is disabled by default).
