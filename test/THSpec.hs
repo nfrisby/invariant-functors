@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -6,6 +7,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+#if __GLASGOW_HASKELL__ >= 708
+{-# LANGUAGE EmptyCase #-}
+#endif
+
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
 #if __GLASGOW_HASKELL__ >= 800
@@ -60,6 +65,9 @@ data Existential b
 
 type IntFun a b = b -> a
 data IntFunD a b = IntFunD (IntFun a b)
+
+data Empty1 a b
+data Empty2 a b
 
 -- Data families
 
@@ -132,6 +140,13 @@ $(deriveInvariant ''Existential)
 
 $(deriveInvariant  ''IntFunD)
 $(deriveInvariant2 ''IntFunD)
+
+$(deriveInvariant  ''Empty1)
+$(deriveInvariant2 ''Empty1)
+
+-- Use EmptyCase here
+$(deriveInvariantOptions  defaultOptions{emptyCaseBehavior = True} ''Empty2)
+$(deriveInvariant2Options defaultOptions{emptyCaseBehavior = True} ''Empty2)
 
 #if MIN_VERSION_template_haskell(2,7,0)
 -- Data Families

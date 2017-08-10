@@ -15,12 +15,19 @@ module Data.Functor.Invariant.TH (
       -- * @deriveInvariant(2)@
       -- $deriveInvariant
       deriveInvariant
+    , deriveInvariantOptions
       -- $deriveInvariant2
     , deriveInvariant2
+    , deriveInvariant2Options
       -- * @makeInvmap(2)@
       -- $make
     , makeInvmap
+    , makeInvmapOptions
     , makeInvmap2
+    , makeInvmap2Options
+      -- * 'Options'
+    , Options(..)
+    , defaultOptions
     ) where
 
 import           Control.Monad (unless, when)
@@ -38,6 +45,22 @@ import           Language.Haskell.TH.Syntax
 -------------------------------------------------------------------------------
 -- User-facing API
 -------------------------------------------------------------------------------
+
+-- | Options that further configure how the functions in
+-- "Data.Functor.Invariant.TH" should behave.
+newtype Options = Options
+  { emptyCaseBehavior :: Bool
+    -- ^ If 'True', derived instances for empty data types (i.e., ones with
+    --   no data constructors) will use the @EmptyCase@ language extension.
+    --   If 'False', derived instances will simply use 'seq' instead.
+    --   (This has no effect on GHCs before 7.8, since @EmptyCase@ is only
+    --   available in 7.8 or later.)
+  } deriving (Eq, Ord, Read, Show)
+
+-- | Conservative 'Options' that doesn't attempt to use @EmptyCase@ (to
+-- prevent users from having to enable that extension at use sites.)
+defaultOptions :: Options
+defaultOptions = Options { emptyCaseBehavior = False }
 
 {- $deriveInvariant
 
@@ -115,7 +138,11 @@ Note that there are some limitations:
 -- | Generates an 'Invariant' instance declaration for the given data type or data
 -- family instance.
 deriveInvariant :: Name -> Q [Dec]
-deriveInvariant = deriveInvariantClass Invariant
+deriveInvariant = deriveInvariantOptions defaultOptions
+
+-- | Like 'deriveInvariant', but takes an 'Options' argument.
+deriveInvariantOptions :: Options -> Name -> Q [Dec]
+deriveInvariantOptions = deriveInvariantClass Invariant
 
 {- $deriveInvariant2
 
@@ -171,7 +198,11 @@ with some caveats:
 -- | Generates an 'Invariant2' instance declaration for the given data type or data
 -- family instance.
 deriveInvariant2 :: Name -> Q [Dec]
-deriveInvariant2 = deriveInvariantClass Invariant2
+deriveInvariant2 = deriveInvariant2Options defaultOptions
+
+-- | Like 'deriveInvariant2', but takes an 'Options' argument.
+deriveInvariant2Options :: Options -> Name -> Q [Dec]
+deriveInvariant2Options = deriveInvariantClass Invariant2
 
 {- $make
 
@@ -202,12 +233,20 @@ instance Invariant (f a b) => Invariant (HigherKinded f a b) where
 -- | Generates a lambda expression which behaves like 'invmap' (without requiring an
 -- 'Invariant' instance).
 makeInvmap :: Name -> Q Exp
-makeInvmap = makeInvmapClass Invariant
+makeInvmap = makeInvmapOptions defaultOptions
+
+-- | Like 'makeInvmap', but takes an 'Options' argument.
+makeInvmapOptions :: Options -> Name -> Q Exp
+makeInvmapOptions = makeInvmapClass Invariant
 
 -- | Generates a lambda expression which behaves like 'invmap2' (without requiring an
 -- 'Invariant2' instance).
 makeInvmap2 :: Name -> Q Exp
-makeInvmap2 = makeInvmapClass Invariant2
+makeInvmap2 = makeInvmap2Options defaultOptions
+
+-- | Like 'makeInvmap2', but takes an 'Options' argument.
+makeInvmap2Options :: Options -> Name -> Q Exp
+makeInvmap2Options = makeInvmapClass Invariant2
 
 -------------------------------------------------------------------------------
 -- Code generation
@@ -215,8 +254,8 @@ makeInvmap2 = makeInvmapClass Invariant2
 
 -- | Derive an Invariant(2) instance declaration (depending on the InvariantClass
 -- argument's value).
-deriveInvariantClass :: InvariantClass -> Name -> Q [Dec]
-deriveInvariantClass iClass name = do
+deriveInvariantClass :: InvariantClass -> Options -> Name -> Q [Dec]
+deriveInvariantClass iClass opts name = do
   info <- reifyDatatype name
   case info of
     DatatypeInfo { datatypeContext = ctxt
@@ -229,23 +268,23 @@ deriveInvariantClass iClass name = do
         <- buildTypeInstance iClass parentName ctxt vars variant
       (:[]) `fmap` instanceD (return instanceCxt)
                              (return instanceType)
-                             (invmapDecs iClass vars cons)
+                             (invmapDecs iClass opts vars cons)
 
 -- | Generates a declaration defining the primary function corresponding to a
 -- particular class (invmap for Invariant and invmap2 for Invariant2).
-invmapDecs :: InvariantClass -> [Type] -> [ConstructorInfo] -> [Q Dec]
-invmapDecs iClass vars cons =
+invmapDecs :: InvariantClass -> Options -> [Type] -> [ConstructorInfo] -> [Q Dec]
+invmapDecs iClass opts vars cons =
     [ funD (invmapName iClass)
            [ clause []
-                    (normalB $ makeInvmapForCons iClass vars cons)
+                    (normalB $ makeInvmapForCons iClass opts vars cons)
                     []
            ]
     ]
 
 -- | Generates a lambda expression which behaves like invmap (for Invariant),
 -- or invmap2 (for Invariant2).
-makeInvmapClass :: InvariantClass -> Name -> Q Exp
-makeInvmapClass iClass name = do
+makeInvmapClass :: InvariantClass -> Options -> Name -> Q Exp
+makeInvmapClass iClass opts name = do
   info <- reifyDatatype name
   case info of
     DatatypeInfo { datatypeContext = ctxt
@@ -258,12 +297,12 @@ makeInvmapClass iClass name = do
       -- or not the provided datatype can actually have invmap/invmap2
       -- implemented for it, and produces errors if it can't.
       buildTypeInstance iClass parentName ctxt vars variant
-        `seq` makeInvmapForCons iClass vars cons
+        `seq` makeInvmapForCons iClass opts vars cons
 
 -- | Generates a lambda expression for invmap(2) for the given constructors.
 -- All constructors must be from the same type.
-makeInvmapForCons :: InvariantClass -> [Type] -> [ConstructorInfo] -> Q Exp
-makeInvmapForCons iClass vars cons = do
+makeInvmapForCons :: InvariantClass -> Options -> [Type] -> [ConstructorInfo] -> Q Exp
+makeInvmapForCons iClass opts vars cons = do
     let numNbs = fromEnum iClass
 
     value      <- newName "value"
@@ -277,12 +316,29 @@ makeInvmapForCons iClass vars cons = do
     lamE (map varP argNames)
         . appsE
         $ [ varE $ invmapConstName iClass
-          , if null cons
-               then appE (varE errorValName)
-                         (stringE $ "Void " ++ nameBase (invmapName iClass))
-               else caseE (varE value)
-                          (map (makeInvmapForCon iClass tvMap) cons)
+          , makeFun value tvMap
           ] ++ map varE argNames
+  where
+    makeFun :: Name -> TyVarMap -> Q Exp
+    makeFun value tvMap
+      | emptyCaseBehavior opts && ghc7'8OrLater
+      = caseE (varE value) []
+
+      | null cons
+      = appE (varE seqValName) (varE value) `appE`
+        appE (varE errorValName)
+             (stringE $ "Void " ++ nameBase (invmapName iClass))
+
+      | otherwise
+      = caseE (varE value)
+              (map (makeInvmapForCon iClass tvMap) cons)
+
+    ghc7'8OrLater :: Bool
+#if __GLASGOW_HASKELL__ >= 708
+    ghc7'8OrLater = True
+#else
+    ghc7'8OrLater = False
+#endif
 
 -- | Generates a lambda expression for invmap(2) for a single constructor.
 makeInvmapForCon :: InvariantClass -> TyVarMap -> ConstructorInfo -> Q Match
@@ -550,54 +606,75 @@ deriveConstraint iClass t
 {-
 Note [Kind signatures in derived instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 It is possible to put explicit kind signatures into the derived instances, e.g.,
+
   instance C a => C (Data (f :: * -> *)) where ...
+
 But it is preferable to avoid this if possible. If we come up with an incorrect
 kind signature (which is entirely possible, since our type inferencer is pretty
 unsophisticated - see Note [Type inference in derived instances]), then GHC will
 flat-out reject the instance, which is quite unfortunate.
+
 Plain old datatypes have the advantage that you can avoid using any kind signatures
 at all in their instances. This is because a datatype declaration uses all type
 variables, so the types that we use in a derived instance uniquely determine their
 kinds. As long as we plug in the right types, the kind inferencer can do the rest
 of the work. For this reason, we use unSigT to remove all kind signatures before
 splicing in the instance context and head.
+
 Data family instances are trickier, since a data family can have two instances that
 are distinguished by kind alone, e.g.,
+
   data family Fam (a :: k)
   data instance Fam (a :: * -> *)
   data instance Fam (a :: *)
+
 If we dropped the kind signatures for C (Fam a), then GHC will have no way of
 knowing which instance we are talking about. To avoid this scenario, we always
 include explicit kind signatures in data family instances. There is a chance that
 the inferred kind signatures will be incorrect, but if so, we can always fall back
 on the make- functions.
+
 Note [Type inference in derived instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Type inference is can be tricky to get right, and we want to avoid recreating the
 entirety of GHC's type inferencer in Template Haskell. For this reason, we will
 probably never come up with derived instance contexts that are as accurate as
 GHC's. But that doesn't mean we can't do anything! There are a couple of simple
 things we can do to make instance contexts that work for 80% of use cases:
+
 1. If one of the last type parameters is polykinded, then its kind will be
    specialized to * in the derived instance. We note what kind variable the type
    parameter had and substitute it with * in the other types as well. For example,
    imagine you had
+
      data Data (a :: k) (b :: k) (c :: k)
+
    Then you'd want to derived instance to be:
+
      instance C (Data (a :: *))
+
    Not:
+
      instance C (Data (a :: k))
+
 2. We naïvely come up with instance constraints using the following criteria:
+
    (i)  If there's a type parameter n of kind k1 -> k2 (where k1/k2 are * or kind
         variables), then generate an Invariant n constraint, and if k1/k2 are kind
         variables, then substitute k1/k2 with * elsewhere in the types. We must
         consider the case where they are kind variables because you might have a
         scenario like this:
+
           newtype Compose (f :: k3 -> *) (g :: k1 -> k2 -> k3) (a :: k1) (b :: k2)
             = Compose (f (g a b))
+
         Which would have a derived Invariant2 instance of:
+
           instance (Invariant f, Invariant2 g) => Invariant2 (Compose f g) where ...
+
    (ii) If there's a type parameter n of kind k1 -> k2 -> k3 (where k1/k2/k3 are
         * or kind variables), then generate a Invariant2 n constraint and perform
         kind substitution as in the other case.

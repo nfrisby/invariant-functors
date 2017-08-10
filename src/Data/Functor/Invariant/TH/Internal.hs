@@ -393,6 +393,9 @@ invmap2ConstValName = mkInvariantName_v "Data.Functor.Invariant.TH.Internal" "in
 errorValName :: Name
 errorValName = mkNameG_v "base" "GHC.Err" "error"
 
+seqValName :: Name
+seqValName = mkNameG_v "ghc-prim" "GHC.Prim" "seq"
+
 #if MIN_VERSION_base(4,6,0) && !(MIN_VERSION_base(4,9,0))
 starKindName :: Name
 starKindName = mkNameG_tc "ghc-prim" "GHC.Prim" "*"
