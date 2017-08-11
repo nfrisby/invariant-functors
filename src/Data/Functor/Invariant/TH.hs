@@ -268,15 +268,16 @@ deriveInvariantClass iClass opts name = do
         <- buildTypeInstance iClass parentName ctxt vars variant
       (:[]) `fmap` instanceD (return instanceCxt)
                              (return instanceType)
-                             (invmapDecs iClass opts vars cons)
+                             (invmapDecs iClass opts parentName vars cons)
 
 -- | Generates a declaration defining the primary function corresponding to a
 -- particular class (invmap for Invariant and invmap2 for Invariant2).
-invmapDecs :: InvariantClass -> Options -> [Type] -> [ConstructorInfo] -> [Q Dec]
-invmapDecs iClass opts vars cons =
+invmapDecs :: InvariantClass -> Options -> Name -> [Type] -> [ConstructorInfo]
+           -> [Q Dec]
+invmapDecs iClass opts parentName vars cons =
     [ funD (invmapName iClass)
            [ clause []
-                    (normalB $ makeInvmapForCons iClass opts vars cons)
+                    (normalB $ makeInvmapForCons iClass opts parentName vars cons)
                     []
            ]
     ]
@@ -297,14 +298,13 @@ makeInvmapClass iClass opts name = do
       -- or not the provided datatype can actually have invmap/invmap2
       -- implemented for it, and produces errors if it can't.
       buildTypeInstance iClass parentName ctxt vars variant
-        `seq` makeInvmapForCons iClass opts vars cons
+        `seq` makeInvmapForCons iClass opts parentName vars cons
 
 -- | Generates a lambda expression for invmap(2) for the given constructors.
 -- All constructors must be from the same type.
-makeInvmapForCons :: InvariantClass -> Options -> [Type] -> [ConstructorInfo] -> Q Exp
-makeInvmapForCons iClass opts vars cons = do
-    let numNbs = fromEnum iClass
-
+makeInvmapForCons :: InvariantClass -> Options -> Name -> [Type] -> [ConstructorInfo]
+                  -> Q Exp
+makeInvmapForCons iClass opts _parentName vars cons = do
     value      <- newName "value"
     covMaps    <- newNameList "covMap" numNbs
     contraMaps <- newNameList "contraMap" numNbs
@@ -319,19 +319,35 @@ makeInvmapForCons iClass opts vars cons = do
           , makeFun value tvMap
           ] ++ map varE argNames
   where
+    numNbs :: Int
+    numNbs = fromEnum iClass
+
     makeFun :: Name -> TyVarMap -> Q Exp
-    makeFun value tvMap
-      | emptyCaseBehavior opts && ghc7'8OrLater
-      = caseE (varE value) []
+    makeFun value tvMap = do
+#if MIN_VERSION_template_haskell(2,9,0)
+      roles <- reifyRoles _parentName
+      let rroles = roles
+#endif
+      case () of
+        _
 
-      | null cons
-      = appE (varE seqValName) (varE value) `appE`
-        appE (varE errorValName)
-             (stringE $ "Void " ++ nameBase (invmapName iClass))
+#if MIN_VERSION_template_haskell(2,9,0)
+          | (length rroles >= numNbs) &&
+            (all (== PhantomR) (take numNbs rroles))
+         -> varE coerceValName `appE` varE value
+#endif
 
-      | otherwise
-      = caseE (varE value)
-              (map (makeInvmapForCon iClass tvMap) cons)
+          | null cons && emptyCaseBehavior opts && ghc7'8OrLater
+         -> caseE (varE value) []
+
+          | null cons
+         -> appE (varE seqValName) (varE value) `appE`
+            appE (varE errorValName)
+                 (stringE $ "Void " ++ nameBase (invmapName iClass))
+
+          | otherwise
+         -> caseE (varE value)
+                  (map (makeInvmapForCon iClass tvMap) cons)
 
     ghc7'8OrLater :: Bool
 #if __GLASGOW_HASKELL__ >= 708

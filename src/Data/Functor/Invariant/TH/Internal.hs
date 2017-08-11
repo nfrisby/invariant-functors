@@ -390,6 +390,9 @@ invmapConstValName = mkInvariantName_v "Data.Functor.Invariant.TH.Internal" "inv
 invmap2ConstValName :: Name
 invmap2ConstValName = mkInvariantName_v "Data.Functor.Invariant.TH.Internal" "invmap2Const"
 
+coerceValName :: Name
+coerceValName = mkNameG_v "ghc-prim" "GHC.Prim" "coerce"
+
 errorValName :: Name
 errorValName = mkNameG_v "base" "GHC.Err" "error"
 

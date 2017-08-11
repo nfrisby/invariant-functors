@@ -1,6 +1,9 @@
 # next [????.??.??]
 * `Data.Functor.Invariant.TH` now derives `invmap(2)` implementations for empty
   data types that are strict in the argument.
+* When using `Data.Functor.Invariant.TH` to derive `Invariant(2)` instances for
+  data types where the last type variables are at phantom roles, generated
+  `invmap(2)` implementations now use `coerce` for efficiency.
 * Add `Options` to `Data.Functor.Invariant.TH`, along with variants of existing
   functions that take `Options` as an argument. For now, the only configurable
   option is whether derived instances for empty data types should use the
