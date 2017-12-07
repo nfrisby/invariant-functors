@@ -1,4 +1,4 @@
-# next [????.??.??]
+# 0.5 [2017.12.07]
 * `Data.Functor.Invariant.TH` now derives `invmap(2)` implementations for empty
   data types that are strict in the argument.
 * When using `Data.Functor.Invariant.TH` to derive `Invariant(2)` instances for
