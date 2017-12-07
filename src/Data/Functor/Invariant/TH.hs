@@ -298,7 +298,7 @@ makeInvmapClass iClass opts name = do
       -- or not the provided datatype can actually have invmap/invmap2
       -- implemented for it, and produces errors if it can't.
       buildTypeInstance iClass parentName ctxt vars variant
-        `seq` makeInvmapForCons iClass opts parentName vars cons
+        >> makeInvmapForCons iClass opts parentName vars cons
 
 -- | Generates a lambda expression for invmap(2) for the given constructors.
 -- All constructors must be from the same type.
