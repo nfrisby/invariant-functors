@@ -67,4 +67,5 @@ test-suite spec
                      , invariant
                      , QuickCheck       >= 2   && < 3
                      , template-haskell >= 2.4 && < 2.13
+  build-tool-depends:  hspec-discover:hspec-discover
   ghc-options:         -Wall
