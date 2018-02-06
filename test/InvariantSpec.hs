@@ -4,7 +4,6 @@ import Data.Functor.Invariant
 import Test.Hspec
 import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck
-import Test.QuickCheck.Function
 
 main :: IO ()
 main = hspec spec

@@ -62,10 +62,10 @@ test-suite spec
   main-is:             Spec.hs
   other-modules:       InvariantSpec
                        THSpec
-  build-depends:       base             >= 4   && < 5
+  build-depends:       base             >= 4    && < 5
                      , hspec            >= 1.8
                      , invariant
-                     , QuickCheck       >= 2   && < 3
-                     , template-haskell >= 2.4 && < 2.13
+                     , QuickCheck       >= 2.11 && < 3
+                     , template-haskell >= 2.4  && < 2.13
   build-tool-depends:  hspec-discover:hspec-discover
   ghc-options:         -Wall
