@@ -1,3 +1,7 @@
+# 0.5.1 [2018.07.15]
+* Depend on `QuickCheck-2.11` or later in the test suite.
+* Some Haddock fixes in `Data.Functor.Invariant.TH`.
+
 # 0.5 [2017.12.07]
 * `Data.Functor.Invariant.TH` now derives `invmap(2)` implementations for empty
   data types that are strict in the argument.
