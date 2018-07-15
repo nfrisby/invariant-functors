@@ -7,8 +7,10 @@ License:     BSD-style (see the file LICENSE)
 Maintainer:  Ryan Scott
 Portability: Template Haskell
 
-Functions to mechanically derive 'Invariant' or 'Invariant2' instances,
-or to splice 'invmap' or 'invmap2' into Haskell source code. You need to enable
+Functions to mechanically derive 'Data.Functor.Invariant.Invariant'
+or 'Data.Functor.Invariant.Invariant2' instances,
+or to splice 'Data.Functor.Invariant.invmap' or
+'Data.Functor.Invariant.invmap2' into Haskell source code. You need to enable
 the @TemplateHaskell@ language extension in order to use this module.
 -}
 module Data.Functor.Invariant.TH (
@@ -64,10 +66,11 @@ defaultOptions = Options { emptyCaseBehavior = False }
 
 {- $deriveInvariant
 
-'deriveInvariant' automatically generates an 'Invariant' instance declaration for a
-data type, newtype, or data family instance that has at least one type variable.
-This emulates what would (hypothetically) happen if you could attach a @deriving
-'Invariant'@ clause to the end of a data declaration. Examples:
+'deriveInvariant' automatically generates an 'Data.Functor.Invariant.Invariant'
+instance declaration for a data type, newtype, or data family instance that has
+at least one type variable.  This emulates what would (hypothetically) happen
+if you could attach a @deriving 'Data.Functor.Invariant.Invariant'@ clause to
+the end of a data declaration. Examples:
 
 @
 &#123;-&#35; LANGUAGE TemplateHaskell &#35;-&#125;
@@ -81,7 +84,7 @@ $('deriveInvariant' ''Alt) -- instance Invariant f => Invariant (Alt f) where ..
 @
 
 If you are using @template-haskell-2.7.0.0@ or later (i.e., GHC 7.4 or later),
-'deriveInvariant' can also be used to derive 'Invariant' instances for data family
+'deriveInvariant' can also be used to derive 'Data.Functor.Invariant.Invariant' instances for data family
 instances (which requires the @-XTypeFamilies@ extension). To do so, pass the name of
 a data or newtype instance constructor to 'deriveInvariant'.  Note that the generated
 code may require the @-XFlexibleInstances@ extension. Some examples:
@@ -107,18 +110,19 @@ Note that there are some limitations:
 * The 'Name' argument to 'deriveInvariant' must not be a type synonym.
 
 * With 'deriveInvariant', the argument's last type variable must be of kind @*@.
-  For other ones, type variables of kind @* -> *@ are assumed to require an 'Invariant'
-  context. For more complicated scenarios, use 'makeInvmap'.
+  For other ones, type variables of kind @* -> *@ are assumed to require an
+  'Data.Functor.Invariant.Invariant' context. For more complicated scenarios,
+  use 'makeInvmap'.
 
 * If using the @-XDatatypeContexts@, @-XExistentialQuantification@, or @-XGADTs@
   extensions, a constraint cannot mention the last type variable. For example,
   @data Illegal a where I :: Ord a => a -> Illegal a@ cannot have a derived
-  'Invariant' instance.
+  'Data.Functor.Invariant.Invariant' instance.
 
 * If the last type variable is used within a data field of a constructor, it must only
   be used in the last argument of the data type constructor. For example, @data Legal a
-  = Legal (Either Int a)@ can have a derived 'Invariant' instance, but @data Illegal a =
-  Illegal (Either a a)@ cannot.
+  = Legal (Either Int a)@ can have a derived 'Data.Functor.Invariant.Invariant' instance,
+  but @data Illegal a = Illegal (Either a a)@ cannot.
 
 * Data family instances must be able to eta-reduce the last type variable. In other
   words, if you have a instance of the form:
@@ -135,8 +139,8 @@ Note that there are some limitations:
 
 -}
 
--- | Generates an 'Invariant' instance declaration for the given data type or data
--- family instance.
+-- | Generates an 'Data.Functor.Invariant.Invariant' instance declaration for the given
+-- data type or data family instance.
 deriveInvariant :: Name -> Q [Dec]
 deriveInvariant = deriveInvariantOptions defaultOptions
 
@@ -146,10 +150,12 @@ deriveInvariantOptions = deriveInvariantClass Invariant
 
 {- $deriveInvariant2
 
-'deriveInvariant2' automatically generates an 'Invariant2' instance declaration for
-a data type, newtype, or data family instance that has at least two type variables.
-This emulates what would (hypothetically) happen if you could attach a @deriving
-'Invariant2'@ clause to the end of a data declaration. Examples:
+'deriveInvariant2' automatically generates an
+'Data.Functor.Invariant.Invariant2' instance declaration for a data type,
+newtype, or data family instance that has at least two type variables.  This
+emulates what would (hypothetically) happen if you could attach a @deriving
+'Data.Functor.Invariant.Invariant2'@ clause to the end of a data declaration.
+Examples:
 
 @
 &#123;-&#35; LANGUAGE TemplateHaskell &#35;-&#125;
@@ -166,19 +172,20 @@ The same restrictions that apply to 'deriveInvariant' also apply to 'deriveInvar
 with some caveats:
 
 * With 'deriveInvariant2', the last type variables must both be of kind @*@. For other
-  ones, type variables of kind @* -> *@ are assumed to require an 'Invariant'
+  ones, type variables of kind @* -> *@ are assumed to require an 'Data.Functor.Invariant.Invariant'
   constraint, and type variables of kind @* -> * -> *@ are assumed to require an
-  'Invariant2' constraint. For more complicated scenarios, use 'makeInvmap2'.
+  'Data.Functor.Invariant.Invariant2' constraint. For more complicated scenarios, use 'makeInvmap2'.
 
 * If using the @-XDatatypeContexts@, @-XExistentialQuantification@, or @-XGADTs@
   extensions, a constraint cannot mention either of the last two type variables. For
   example, @data Illegal2 a b where I2 :: Ord a => a -> b -> Illegal2 a b@ cannot
-  have a derived 'Invariant2' instance.
+  have a derived 'Data.Functor.Invariant.Invariant2' instance.
 
 * If either of the last two type variables is used within a data field of a constructor,
   it must only be used in the last two arguments of the data type constructor. For
-  example, @data Legal a b = Legal (Int, Int, a, b)@ can have a derived 'Invariant2'
-  instance, but @data Illegal a b = Illegal (a, b, a, b)@ cannot.
+  example, @data Legal a b = Legal (Int, Int, a, b)@ can have a derived
+  'Data.Functor.Invariant.Invariant2' instance, but
+  @data Illegal a b = Illegal (a, b, a, b)@ cannot.
 
 * Data family instances must be able to eta-reduce the last two type variables. In other
   words, if you have a instance of the form:
@@ -195,8 +202,8 @@ with some caveats:
 
 -}
 
--- | Generates an 'Invariant2' instance declaration for the given data type or data
--- family instance.
+-- | Generates an 'Data.Functor.Invariant.Invariant2' instance declaration for
+-- the given data type or data family instance.
 deriveInvariant2 :: Name -> Q [Dec]
 deriveInvariant2 = deriveInvariant2Options defaultOptions
 
@@ -206,16 +213,18 @@ deriveInvariant2Options = deriveInvariantClass Invariant2
 
 {- $make
 
-There may be scenarios in which you want to @invmap@ over an arbitrary data type or
-data family instance without having to make the type an instance of 'Invariant'. For
-these cases, this module provides several functions (all prefixed with @make-@) that
-splice the appropriate lambda expression into your source code. Example:
+There may be scenarios in which you want to @invmap@ over an arbitrary data
+type or data family instance without having to make the type an instance of
+'Data.Functor.Invariant.Invariant'. For these cases, this module provides
+several functions (all prefixed with @make-@) that splice the appropriate
+lambda expression into your source code. Example:
 
-This is particularly useful for creating instances for sophisticated data types. For
-example, 'deriveInvariant' cannot infer the correct type context for @newtype
-HigherKinded f a b c = HigherKinded (f a b c)@, since @f@ is of kind
-@* -> * -> * -> *@. However, it is still possible to create an 'Invariant' instance
-for @HigherKinded@ without too much trouble using 'makeInvmap':
+This is particularly useful for creating instances for sophisticated data
+types. For example, 'deriveInvariant' cannot infer the correct type context for
+@newtype HigherKinded f a b c = HigherKinded (f a b c)@, since @f@ is of kind
+@* -> * -> * -> *@. However, it is still possible to create an
+'Data.Functor.Invariant.Invariant' instance for @HigherKinded@ without too much
+trouble using 'makeInvmap':
 
 @
 &#123;-&#35; LANGUAGE FlexibleContexts, TemplateHaskell &#35;-&#125;
@@ -230,8 +239,9 @@ instance Invariant (f a b) => Invariant (HigherKinded f a b) where
 
 -}
 
--- | Generates a lambda expression which behaves like 'invmap' (without requiring an
--- 'Invariant' instance).
+-- | Generates a lambda expression which behaves like
+-- 'Data.Functor.Invariant.invmap' (without requiring an
+-- 'Data.Functor.Invariant.Invariant' instance).
 makeInvmap :: Name -> Q Exp
 makeInvmap = makeInvmapOptions defaultOptions
 
@@ -239,8 +249,9 @@ makeInvmap = makeInvmapOptions defaultOptions
 makeInvmapOptions :: Options -> Name -> Q Exp
 makeInvmapOptions = makeInvmapClass Invariant
 
--- | Generates a lambda expression which behaves like 'invmap2' (without requiring an
--- 'Invariant2' instance).
+-- | Generates a lambda expression which behaves like
+-- 'Data.Functor.Invariant.invmap2' (without requiring an
+-- 'Data.Functor.Invariant.Invariant2' instance).
 makeInvmap2 :: Name -> Q Exp
 makeInvmap2 = makeInvmap2Options defaultOptions
 
