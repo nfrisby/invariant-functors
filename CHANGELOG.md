@@ -1,3 +1,6 @@
+# Next
+* Only incur a `semigroups` dependency on old GHCs.
+
 # 0.5.1 [2018.07.15]
 * Depend on `QuickCheck-2.11` or later in the test suite.
 * Some Haddock fixes in `Data.Functor.Invariant.TH`.
