@@ -1,4 +1,5 @@
-# Next
+# Next [????.??.??]
+* Support `th-abstraction-0.3.0.0` or later.
 * Only incur a `semigroups` dependency on old GHCs.
 
 # 0.5.1 [2018.07.15]

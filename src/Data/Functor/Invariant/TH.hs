@@ -269,26 +269,30 @@ deriveInvariantClass :: InvariantClass -> Options -> Name -> Q [Dec]
 deriveInvariantClass iClass opts name = do
   info <- reifyDatatype name
   case info of
-    DatatypeInfo { datatypeContext = ctxt
-                 , datatypeName    = parentName
-                 , datatypeVars    = vars
-                 , datatypeVariant = variant
-                 , datatypeCons    = cons
+    DatatypeInfo { datatypeContext   = ctxt
+                 , datatypeName      = parentName
+#if MIN_VERSION_th_abstraction(0,3,0)
+                 , datatypeInstTypes = instTys
+#else
+                 , datatypeVars      = instTys
+#endif
+                 , datatypeVariant   = variant
+                 , datatypeCons      = cons
                  } -> do
       (instanceCxt, instanceType)
-        <- buildTypeInstance iClass parentName ctxt vars variant
+        <- buildTypeInstance iClass parentName ctxt instTys variant
       (:[]) `fmap` instanceD (return instanceCxt)
                              (return instanceType)
-                             (invmapDecs iClass opts parentName vars cons)
+                             (invmapDecs iClass opts parentName instTys cons)
 
 -- | Generates a declaration defining the primary function corresponding to a
 -- particular class (invmap for Invariant and invmap2 for Invariant2).
 invmapDecs :: InvariantClass -> Options -> Name -> [Type] -> [ConstructorInfo]
            -> [Q Dec]
-invmapDecs iClass opts parentName vars cons =
+invmapDecs iClass opts parentName instTys cons =
     [ funD (invmapName iClass)
            [ clause []
-                    (normalB $ makeInvmapForCons iClass opts parentName vars cons)
+                    (normalB $ makeInvmapForCons iClass opts parentName instTys cons)
                     []
            ]
     ]
@@ -299,29 +303,33 @@ makeInvmapClass :: InvariantClass -> Options -> Name -> Q Exp
 makeInvmapClass iClass opts name = do
   info <- reifyDatatype name
   case info of
-    DatatypeInfo { datatypeContext = ctxt
-                 , datatypeName    = parentName
-                 , datatypeVars    = vars
-                 , datatypeVariant = variant
-                 , datatypeCons    = cons
+    DatatypeInfo { datatypeContext   = ctxt
+                 , datatypeName      = parentName
+#if MIN_VERSION_th_abstraction(0,3,0)
+                 , datatypeInstTypes = instTys
+#else
+                 , datatypeVars      = instTys
+#endif
+                 , datatypeVariant   = variant
+                 , datatypeCons      = cons
                  } ->
       -- We force buildTypeInstance here since it performs some checks for whether
       -- or not the provided datatype can actually have invmap/invmap2
       -- implemented for it, and produces errors if it can't.
-      buildTypeInstance iClass parentName ctxt vars variant
-        >> makeInvmapForCons iClass opts parentName vars cons
+      buildTypeInstance iClass parentName ctxt instTys variant
+        >> makeInvmapForCons iClass opts parentName instTys cons
 
 -- | Generates a lambda expression for invmap(2) for the given constructors.
 -- All constructors must be from the same type.
 makeInvmapForCons :: InvariantClass -> Options -> Name -> [Type] -> [ConstructorInfo]
                   -> Q Exp
-makeInvmapForCons iClass opts _parentName vars cons = do
+makeInvmapForCons iClass opts _parentName instTys cons = do
     value      <- newName "value"
     covMaps    <- newNameList "covMap" numNbs
     contraMaps <- newNameList "contraMap" numNbs
 
     let mapFuns    = zip covMaps contraMaps
-        lastTyVars = map varTToName $ drop (length vars - fromEnum iClass) vars
+        lastTyVars = map varTToName $ drop (length instTys - fromEnum iClass) instTys
         tvMap      = Map.fromList $ zip lastTyVars mapFuns
         argNames   = concat (transpose [covMaps, contraMaps]) ++ [value]
     lamE (map varP argNames)
