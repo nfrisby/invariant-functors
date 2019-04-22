@@ -1,3 +1,7 @@
+# next [????.??.??]
+* Implement `foldMap'` in the `Foldable` instance for `WrappedFunctor` when
+  building with `base-4.13` or later.
+
 # 0.5.2 [2019.04.26]
 * Support `th-abstraction-0.3.0.0` or later.
 * Only incur a `semigroups` dependency on old GHCs.

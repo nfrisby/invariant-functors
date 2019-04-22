@@ -592,6 +592,9 @@ instance F.Foldable f => F.Foldable (WrappedFunctor f) where
   sum        = F.sum        . unwrapFunctor
   product    = F.product    . unwrapFunctor
 #endif
+#if MIN_VERSION_base(4,13,0)
+  foldMap' f = F.foldMap' f . unwrapFunctor
+#endif
 
 instance T.Traversable f => T.Traversable (WrappedFunctor f) where
   traverse f = fmap  WrapFunctor . T.traverse f . unwrapFunctor
