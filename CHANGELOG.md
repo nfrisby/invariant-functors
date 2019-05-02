@@ -1,4 +1,4 @@
-# next [????.??.??]
+# 0.5.3 [2019.05.02]
 * Implement `foldMap'` in the `Foldable` instance for `WrappedFunctor` when
   building with `base-4.13` or later.
 
