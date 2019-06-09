@@ -271,11 +271,7 @@ deriveInvariantClass iClass opts name = do
   case info of
     DatatypeInfo { datatypeContext   = ctxt
                  , datatypeName      = parentName
-#if MIN_VERSION_th_abstraction(0,3,0)
                  , datatypeInstTypes = instTys
-#else
-                 , datatypeVars      = instTys
-#endif
                  , datatypeVariant   = variant
                  , datatypeCons      = cons
                  } -> do
@@ -305,11 +301,7 @@ makeInvmapClass iClass opts name = do
   case info of
     DatatypeInfo { datatypeContext   = ctxt
                  , datatypeName      = parentName
-#if MIN_VERSION_th_abstraction(0,3,0)
                  , datatypeInstTypes = instTys
-#else
-                 , datatypeVars      = instTys
-#endif
                  , datatypeVariant   = variant
                  , datatypeCons      = cons
                  } ->
