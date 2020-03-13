@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE PatternGuards #-}
 
 {-|
 Module:      Data.Functor.Invariant.TH
@@ -425,7 +426,7 @@ makeInvmapForType iClass conName tvMap covariant (ForallT _ _ ty)
 makeInvmapForType iClass conName tvMap covariant ty =
     let tyCon  :: Type
         tyArgs :: [Type]
-        tyCon:tyArgs = unapplyTy ty
+        (tyCon, tyArgs) = unapplyTy ty
 
         numLastArgs :: Int
         numLastArgs = min (fromEnum iClass) (length tyArgs)
@@ -458,13 +459,13 @@ makeInvmapForType iClass conName tvMap covariant ty =
             appE (makeInvmapForType iClass conName tvMap covariant fieldTy) $ varE fieldName
 
      in case tyCon of
-          ArrowT | mentionsTyArgs ->
-              let [argTy, resTy] = tyArgs
-               in do x <- newName "x"
-                     b <- newName "b"
-                     lamE [varP x, varP b] $
-                       makeInvmapForType iClass conName tvMap covariant resTy `appE` (varE x `appE`
-                         (makeInvmapForType iClass conName tvMap (not covariant) argTy `appE` varE b))
+          ArrowT
+            | mentionsTyArgs, [argTy, resTy] <- tyArgs ->
+               do x <- newName "x"
+                  b <- newName "b"
+                  lamE [varP x, varP b] $
+                    makeInvmapForType iClass conName tvMap covariant resTy `appE` (varE x `appE`
+                      (makeInvmapForType iClass conName tvMap (not covariant) argTy `appE` varE b))
 #if MIN_VERSION_template_haskell(2,6,0)
           UnboxedTupleT n
             | n > 0 && mentionsTyArgs -> makeInvmapTuple unboxedTupP unboxedTupE n
