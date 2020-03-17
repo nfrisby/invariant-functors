@@ -241,23 +241,52 @@ isTyVar (VarT _)   = True
 isTyVar (SigT t _) = isTyVar t
 isTyVar _          = False
 
--- | Is the given type a type family constructor (and not a data family constructor)?
-isTyFamily :: Type -> Q Bool
-isTyFamily (ConT n) = do
-    info <- reify n
-    return $ case info of
+-- | Detect if a Name in a list of provided Names occurs as an argument to some
+-- type family. This makes an effort to exclude /oversaturated/ arguments to
+-- type families. For instance, if one declared the following type family:
+--
+-- @
+-- type family F a :: Type -> Type
+-- @
+--
+-- Then in the type @F a b@, we would consider @a@ to be an argument to @F@,
+-- but not @b@.
+isInTypeFamilyApp :: [Name] -> Type -> [Type] -> Q Bool
+isInTypeFamilyApp names tyFun tyArgs =
+  case tyFun of
+    ConT tcName -> go tcName
+    _           -> return False
+  where
+    go :: Name -> Q Bool
+    go tcName = do
+      info <- reify tcName
+      case info of
 #if MIN_VERSION_template_haskell(2,11,0)
-         FamilyI OpenTypeFamilyD{} _       -> True
+        FamilyI (OpenTypeFamilyD (TypeFamilyHead _ bndrs _ _)) _
+          -> withinFirstArgs bndrs
 #elif MIN_VERSION_template_haskell(2,7,0)
-         FamilyI (FamilyD TypeFam _ _ _) _ -> True
+        FamilyI (FamilyD TypeFam _ bndrs _) _
+          -> withinFirstArgs bndrs
 #else
-         TyConI  (FamilyD TypeFam _ _ _)   -> True
+        TyConI (FamilyD TypeFam _ bndrs _)
+          -> withinFirstArgs bndrs
 #endif
-#if MIN_VERSION_template_haskell(2,9,0)
-         FamilyI ClosedTypeFamilyD{} _     -> True
+
+#if MIN_VERSION_template_haskell(2,11,0)
+        FamilyI (ClosedTypeFamilyD (TypeFamilyHead _ bndrs _ _) _) _
+          -> withinFirstArgs bndrs
+#elif MIN_VERSION_template_haskell(2,9,0)
+        FamilyI (ClosedTypeFamilyD _ bndrs _ _) _
+          -> withinFirstArgs bndrs
 #endif
-         _ -> False
-isTyFamily _ = return False
+
+        _ -> return False
+      where
+        withinFirstArgs :: [a] -> Q Bool
+        withinFirstArgs bndrs =
+          let firstArgs = take (length bndrs) tyArgs
+              argFVs    = freeVariables firstArgs
+          in return $ any (`elem` argFVs) names
 
 -- | Are all of the items in a list (which have an ordering) distinct?
 --
@@ -401,8 +430,3 @@ errorValName = mkNameG_v "base" "GHC.Err" "error"
 
 seqValName :: Name
 seqValName = mkNameG_v "ghc-prim" "GHC.Prim" "seq"
-
-#if MIN_VERSION_base(4,6,0) && !(MIN_VERSION_base(4,9,0))
-starKindName :: Name
-starKindName = mkNameG_tc "ghc-prim" "GHC.Prim" "*"
-#endif

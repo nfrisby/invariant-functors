@@ -1,3 +1,12 @@
+# next [????.??.??]
+* Fix a bug in which `deriveInvariant2` would fail on certain data types with
+  three or parameters if the first two parameters had phantom roles.
+* Fix a bug in which `deriveInvariant(2)` would fail on sufficiently complex
+  uses of rank-n types in constructor fields.
+* Fix a bug in which `deriveInvariant(2)` would needlessly reject data types
+  whose two last type parameters appear as oversaturated arguments to a type
+  family.
+
 # 0.5.3 [2019.05.02]
 * Implement `foldMap'` in the `Foldable` instance for `WrappedFunctor` when
   building with `base-4.13` or later.

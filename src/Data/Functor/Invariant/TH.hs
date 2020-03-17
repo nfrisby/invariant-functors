@@ -37,7 +37,7 @@ import           Control.Monad (unless, when)
 
 import           Data.Functor.Invariant.TH.Internal
 import           Data.List
-import qualified Data.Map as Map (fromList, keys, lookup, size)
+import qualified Data.Map as Map ((!), fromList, keys, lookup, member, size)
 import           Data.Maybe
 
 import           Language.Haskell.TH.Datatype
@@ -322,7 +322,7 @@ makeInvmapForCons iClass opts _parentName instTys cons = do
     contraMaps <- newNameList "contraMap" numNbs
 
     let mapFuns    = zip covMaps contraMaps
-        lastTyVars = map varTToName $ drop (length instTys - fromEnum iClass) instTys
+        lastTyVars = map varTToName $ drop (length instTys - numNbs) instTys
         tvMap      = Map.fromList $ zip lastTyVars mapFuns
         argNames   = concat (transpose [covMaps, contraMaps]) ++ [value]
     lamE (map varP argNames)
@@ -345,7 +345,7 @@ makeInvmapForCons iClass opts _parentName instTys cons = do
 
 #if MIN_VERSION_template_haskell(2,9,0)
           | (length rroles >= numNbs) &&
-            (all (== PhantomR) (take numNbs rroles))
+            (all (== PhantomR) (drop (length rroles - numNbs) rroles))
          -> varE coerceValName `appE` varE value
 #endif
 
@@ -368,121 +368,51 @@ makeInvmapForCons iClass opts _parentName instTys cons = do
     ghc7'8OrLater = False
 #endif
 
--- | Generates a lambda expression for invmap(2) for a single constructor.
+-- | Generates a match for invmap(2) for a single constructor.
 makeInvmapForCon :: InvariantClass -> TyVarMap -> ConstructorInfo -> Q Match
 makeInvmapForCon iClass tvMap
-  (ConstructorInfo { constructorName    = conName
-                   , constructorContext = ctxt
-                   , constructorFields  = ts })= do
-    ts'      <- mapM resolveTypeSynonyms ts
-    argNames <- newNameList "arg" $ length ts'
-    if any (`predMentionsName` Map.keys tvMap) ctxt
-         || Map.size tvMap < fromEnum iClass
-       then existentialContextError conName
-       else makeInvmapForArgs iClass tvMap conName ts' argNames
+  con@(ConstructorInfo { constructorName    = conName
+                       , constructorContext = ctxt }) = do
+    when (any (`predMentionsName` Map.keys tvMap) ctxt
+            || Map.size tvMap < fromEnum iClass) $
+      existentialContextError conName
+    parts <- foldDataConArgs iClass tvMap ft_invmap con
+    match_for_con conName parts
+  where
+    ft_invmap :: FFoldType (Exp -> Q Exp)
+    ft_invmap = FT { ft_triv   = return
+                   , ft_var    = \v x -> return $ VarE (fst (tvMap Map.! v)) `AppE` x
+                   , ft_co_var = \v x -> return $ VarE (snd (tvMap Map.! v)) `AppE` x
+                   , ft_fun    = \g h x -> mkSimpleLam $ \b -> do
+                       gg <- g b
+                       h $ x `AppE` gg
+                   , ft_tup  = mkSimpleTupleCase match_for_con
+                   , ft_ty_app = \_ contravariant argGs x -> do
+                       let inspect :: (Type, Exp -> Q Exp, Exp -> Q Exp) -> [Q Exp]
+                           inspect (argTy, g, h)
+                             -- If the argument type is a bare occurrence of one
+                             -- of the data type's last type variables, then we
+                             -- can generate more efficient code.
+                             -- This was inspired by GHC#17880.
+                             | Just argVar <- varTToName_maybe argTy
+                             , Just (covMap, contraMap) <- Map.lookup argVar tvMap
+                             = map (return . VarE) $
+                               if contravariant
+                                  then [contraMap, covMap]
+                                  else [covMap, contraMap]
+                             | otherwise
+                             = [mkSimpleLam g, mkSimpleLam h]
+                       appsE $ varE (invmapName (toEnum (length argGs)))
+                             : concatMap inspect argGs
+                            ++ [return x]
+                   , ft_forall  = \_ g x -> g x
+                   , ft_bad_app = \_ -> outOfPlaceTyVarError conName
+                   }
 
-makeInvmapForArgs :: InvariantClass
-                  -> TyVarMap
-                  -> Name
-                  -> [Type]
-                  -> [Name]
-                  -> Q Match
-makeInvmapForArgs iClass tvMap conName tys args =
-    let mappedArgs :: [Q Exp]
-        mappedArgs = zipWith (makeInvmapForArg iClass conName tvMap) tys args
-     in match (conP conName $ map varP args)
-              (normalB . appsE $ conE conName:mappedArgs)
-              []
-
--- | Generates a lambda expression for invmap(2) for an argument of a constructor.
-makeInvmapForArg :: InvariantClass
-                 -> Name
-                 -> TyVarMap
-                 -> Type
-                 -> Name
-                 -> Q Exp
-makeInvmapForArg iClass conName tvis ty tyExpName =
-    appE (makeInvmapForType iClass conName tvis True ty) (varE tyExpName)
-
--- | Generates a lambda expression for invmap(2) for a specific type.
--- The generated expression depends on the number of type variables.
-makeInvmapForType :: InvariantClass
-                  -> Name
-                  -> TyVarMap
-                  -> Bool
-                  -> Type
-                  -> Q Exp
-makeInvmapForType _ _ tvMap covariant (VarT tyName) =
-    case Map.lookup tyName tvMap of
-         Just (covMap, contraMap) ->
-             varE $ if covariant then covMap else contraMap
-         Nothing -> do -- Produce a lambda expression rather than id, addressing Trac #7436
-             x <- newName "x"
-             lamE [varP x] $ varE x
-makeInvmapForType iClass conName tvMap covariant (SigT ty _) =
-    makeInvmapForType iClass conName tvMap covariant ty
-makeInvmapForType iClass conName tvMap covariant (ForallT _ _ ty)
-    = makeInvmapForType iClass conName tvMap covariant ty
-makeInvmapForType iClass conName tvMap covariant ty =
-    let tyCon  :: Type
-        tyArgs :: [Type]
-        (tyCon, tyArgs) = unapplyTy ty
-
-        numLastArgs :: Int
-        numLastArgs = min (fromEnum iClass) (length tyArgs)
-
-        lhsArgs, rhsArgs :: [Type]
-        (lhsArgs, rhsArgs) = splitAt (length tyArgs - numLastArgs) tyArgs
-
-        tyVarNames :: [Name]
-        tyVarNames = Map.keys tvMap
-
-        doubleMap :: (Bool -> Type -> Q Exp) -> [Type] -> [Q Exp]
-        doubleMap _ []     = []
-        doubleMap f (t:ts) = f covariant t : f (not covariant) t : doubleMap f ts
-
-        mentionsTyArgs :: Bool
-        mentionsTyArgs = any (`mentionsName` tyVarNames) tyArgs
-
-        makeInvmapTuple :: ([Q Pat] -> Q Pat) -> ([Q Exp] -> Q Exp) -> Int -> Q Exp
-        makeInvmapTuple mkTupP mkTupE n = do
-            x  <- newName "x"
-            xs <- newNameList "x" n
-            lamE [varP x] $ caseE (varE x)
-                [ match (mkTupP $ map varP xs)
-                        (normalB . mkTupE $ zipWith makeInvmapTupleField tyArgs xs)
-                        []
-                ]
-
-        makeInvmapTupleField :: Type -> Name -> Q Exp
-        makeInvmapTupleField fieldTy fieldName =
-            appE (makeInvmapForType iClass conName tvMap covariant fieldTy) $ varE fieldName
-
-     in case tyCon of
-          ArrowT
-            | mentionsTyArgs, [argTy, resTy] <- tyArgs ->
-               do x <- newName "x"
-                  b <- newName "b"
-                  lamE [varP x, varP b] $
-                    makeInvmapForType iClass conName tvMap covariant resTy `appE` (varE x `appE`
-                      (makeInvmapForType iClass conName tvMap (not covariant) argTy `appE` varE b))
-#if MIN_VERSION_template_haskell(2,6,0)
-          UnboxedTupleT n
-            | n > 0 && mentionsTyArgs -> makeInvmapTuple unboxedTupP unboxedTupE n
-#endif
-          TupleT n
-            | n > 0 && mentionsTyArgs -> makeInvmapTuple tupP tupE n
-          _ -> do
-              itf <- isTyFamily tyCon
-              if any (`mentionsName` tyVarNames) lhsArgs || (itf && mentionsTyArgs)
-                   then outOfPlaceTyVarError conName tyVarNames
-                   else if any (`mentionsName` tyVarNames) rhsArgs
-                        then appsE $
-                             ( varE (invmapName (toEnum numLastArgs))
-                             : doubleMap (makeInvmapForType iClass conName tvMap) rhsArgs
-                             )
-                        else do x <- newName "x"
-                                lamE [varP x] $ varE x
+    -- Con a1 a2 ... -> Con (f1 a1) (f2 a2) ...
+    match_for_con :: Name -> [Exp -> Q Exp] -> Q Match
+    match_for_con = mkSimpleConMatch $ \conName' xs ->
+       appsE (conE conName':xs) -- Con x1 x2 ..
 
 -------------------------------------------------------------------------------
 -- Template Haskell reifying and AST manipulation
@@ -714,8 +644,8 @@ things we can do to make instance contexts that work for 80% of use cases:
 
 -- | Either the given data type doesn't have enough type variables, or one of
 -- the type variables to be eta-reduced cannot realize kind *.
-derivingKindError :: InvariantClass -> Name -> a
-derivingKindError iClass tyConName = error
+derivingKindError :: InvariantClass -> Name -> Q a
+derivingKindError iClass tyConName = fail
     . showString "Cannot derive well-kinded instance of form ‘"
     . showString className
     . showChar ' '
@@ -734,8 +664,8 @@ derivingKindError iClass tyConName = error
 
 -- | The data type has a DatatypeContext which mentions one of the eta-reduced
 -- type variables.
-datatypeContextError :: Name -> Type -> a
-datatypeContextError dataName instanceType = error
+datatypeContextError :: Name -> Type -> Q a
+datatypeContextError dataName instanceType = fail
     . showString "Can't make a derived instance of ‘"
     . showString (pprint instanceType)
     . showString "‘:\n\tData type ‘"
@@ -745,8 +675,8 @@ datatypeContextError dataName instanceType = error
 
 -- | The data type has an existential constraint which mentions one of the
 -- eta-reduced type variables.
-existentialContextError :: Name -> a
-existentialContextError conName = error
+existentialContextError :: Name -> Q a
+existentialContextError conName = fail
     . showString "Constructor ‘"
     . showString (nameBase conName)
     . showString "‘ must be truly polymorphic in the last argument(s) of the data type"
@@ -754,8 +684,8 @@ existentialContextError conName = error
 
 -- | The data type mentions one of the n eta-reduced type variables in a place other
 -- than the last nth positions of a data type in a constructor's field.
-outOfPlaceTyVarError :: Name -> a
-outOfPlaceTyVarError conName = error
+outOfPlaceTyVarError :: Name -> Q a
+outOfPlaceTyVarError conName = fail
   . showString "Constructor ‘"
   . showString (nameBase conName)
   . showString "‘ must only use its last two type variable(s) within"
@@ -764,7 +694,199 @@ outOfPlaceTyVarError conName = error
 
 -- | One of the last type variables cannot be eta-reduced (see the canEtaReduce
 -- function for the criteria it would have to meet).
-etaReductionError :: Type -> a
-etaReductionError instanceType = error $
+etaReductionError :: Type -> Q a
+etaReductionError instanceType = fail $
     "Cannot eta-reduce to an instance of form \n\tinstance (...) => "
     ++ pprint instanceType
+
+-------------------------------------------------------------------------------
+-- Generic traversal for functor-like deriving
+-------------------------------------------------------------------------------
+
+-- Much of the code below is cargo-culted from the TcGenFunctor module in GHC.
+
+data FFoldType a      -- Describes how to fold over a Type in a functor like way
+   = FT { ft_triv    :: a
+          -- ^ Does not contain variables
+        , ft_var     :: Name -> a
+          -- ^ A bare variable
+        , ft_co_var  :: Name -> a
+          -- ^ A bare variable, contravariantly
+        , ft_fun     :: a -> a -> a
+          -- ^ Function type
+        , ft_tup     :: TupleSort -> [a] -> a
+          -- ^ Tuple type. The [a] is the result of folding over the
+          --   arguments of the tuple.
+        , ft_ty_app  :: Type -> Bool -> [(Type, a, a)] -> a
+          -- ^ Type app, variables only in last argument. The Type is the
+          --   function type, and the [(Type, a, a)] are the last argument
+          --   types. That is, they form the function and argument parts of
+          --   @fun_ty arg_ty_1 ... arg_ty_n@, respectively.
+          --
+          --   The Bool is True if the Type is in a surrounding context that is
+          --   contravariant, and False if the surrounding context is covariant.
+          --   The two @a@ fields in [(Type, a, a)] represent the results of
+          --   folding over the Type in a covariant and contravariant manner,
+          --   respectively.
+        , ft_bad_app :: a
+          -- ^ Type app, variable other than in last arguments
+        , ft_forall  :: [TyVarBndr] -> a -> a
+          -- ^ Forall type
+     }
+
+-- Note that in GHC, this function is pure. It must be monadic here since we:
+--
+-- (1) Expand type synonyms
+-- (2) Detect type family applications
+--
+-- Which require reification in Template Haskell, but are pure in Core.
+functorLikeTraverse :: InvariantClass -- ^ Invariant or Invariant2
+                    -> TyVarMap       -- ^ Variables to look for
+                    -> FFoldType a    -- ^ How to fold
+                    -> Type           -- ^ Type to process
+                    -> Q a
+functorLikeTraverse iClass tvMap (FT { ft_triv = caseTrivial,     ft_var = caseVar
+                                     , ft_co_var = caseCoVar,     ft_fun = caseFun
+                                     , ft_tup = caseTuple,        ft_ty_app = caseTyApp
+                                     , ft_bad_app = caseWrongArg, ft_forall = caseForAll })
+                    ty
+  = do ty' <- resolveTypeSynonyms ty
+       (res, _) <- go False ty'
+       return res
+  where
+    {-
+    go :: Bool        -- Covariant or contravariant context
+       -> Type
+       -> Q (a, Bool) -- (result of type a, does type contain var)
+    -}
+    go co t@AppT{}
+      | (ArrowT, [funArg, funRes]) <- unapplyTy t
+      = do (funArgR, funArgC) <- go (not co) funArg
+           (funResR, funResC) <- go      co  funRes
+           if funArgC || funResC
+              then return (caseFun funArgR funResR, True)
+              else trivial
+    go co t@AppT{} = do
+      let (f, args) = unapplyTy t
+      (_, fc) <- go co f
+      (xrs,       xcs) <- fmap unzip $ mapM (go co) args
+      (contraXrs, _)   <- fmap unzip $ mapM (go (not co)) args
+      let numLastArgs, numFirstArgs :: Int
+          numLastArgs  = min (fromEnum iClass) (length args)
+          numFirstArgs = length args - numLastArgs
+
+          -- tuple :: TupleSort -> Q (a, Bool)
+          tuple tupSort = return (caseTuple tupSort xrs, True)
+
+          -- wrongArg :: Q (a, Bool)
+          wrongArg = return (caseWrongArg, True)
+
+      case () of
+        _ |  not (or xcs)
+          -> trivial -- Variable does not occur
+          -- At this point we know that xrs, xcs is not empty,
+          -- and at least one xr is True
+          |  TupleT len <- f
+          -> tuple $ Boxed len
+#if MIN_VERSION_template_haskell(2,6,0)
+          |  UnboxedTupleT len <- f
+          -> tuple $ Unboxed len
+#endif
+          |  fc || or (take numFirstArgs xcs)
+          -> wrongArg                    -- T (..var..)    ty_1 ... ty_n
+          |  otherwise                   -- T (..no var..) ty_1 ... ty_n
+          -> do itf <- isInTypeFamilyApp tyVarNames f args
+                if itf -- We can't decompose type families, so
+                       -- error if we encounter one here.
+                   then wrongArg
+                   else return ( caseTyApp f co $ drop numFirstArgs
+                                                $ zip3 args xrs contraXrs
+                               , True )
+    go co (SigT t k) = do
+      (_, kc) <- go_kind co k
+      if kc
+         then return (caseWrongArg, True)
+         else go co t
+    go co (VarT v)
+      | Map.member v tvMap
+      = return (if co then caseCoVar v else caseVar v, True)
+      | otherwise
+      = trivial
+    go co (ForallT tvbs _ t) = do
+      (tr, tc) <- go co t
+      let tvbNames = map tvName tvbs
+      if not tc || any (`elem` tvbNames) tyVarNames
+         then trivial
+         else return (caseForAll tvbs tr, True)
+    go _ _ = trivial
+
+    {-
+    go_kind :: Bool
+            -> Kind
+            -> Q (a, Bool)
+    -}
+#if MIN_VERSION_template_haskell(2,9,0)
+    go_kind = go
+#else
+    go_kind _ _ = trivial
+#endif
+
+    -- trivial :: Q (a, Bool)
+    trivial = return (caseTrivial, False)
+
+    tyVarNames :: [Name]
+    tyVarNames = Map.keys tvMap
+
+-- Fold over the arguments of a data constructor in a Functor-like way.
+foldDataConArgs :: InvariantClass -> TyVarMap -> FFoldType a -> ConstructorInfo -> Q [a]
+foldDataConArgs iClass tvMap ft con = do
+  fieldTys <- mapM resolveTypeSynonyms $ constructorFields con
+  mapM foldArg fieldTys
+  where
+    -- foldArg :: Type -> Q a
+    foldArg = functorLikeTraverse iClass tvMap ft
+
+-- Make a 'LamE' using a fresh variable.
+mkSimpleLam :: (Exp -> Q Exp) -> Q Exp
+mkSimpleLam lam = do
+  n <- newName "n"
+  body <- lam (VarE n)
+  return $ LamE [VarP n] body
+
+-- "Con a1 a2 a3 -> fold [x1 a1, x2 a2, x3 a3]"
+--
+-- @mkSimpleConMatch fold conName insides@ produces a match clause in
+-- which the LHS pattern-matches on @extraPats@, followed by a match on the
+-- constructor @conName@ and its arguments. The RHS folds (with @fold@) over
+-- @conName@ and its arguments, applying an expression (from @insides@) to each
+-- of the respective arguments of @conName@.
+mkSimpleConMatch :: (Name -> [a] -> Q Exp)
+                 -> Name
+                 -> [Exp -> a]
+                 -> Q Match
+mkSimpleConMatch fold conName insides = do
+  varsNeeded <- newNameList "_arg" $ length insides
+  let pat = ConP conName (map VarP varsNeeded)
+  rhs <- fold conName (zipWith (\i v -> i $ VarE v) insides varsNeeded)
+  return $ Match pat (NormalB rhs) []
+
+-- Indicates whether a tuple is boxed or unboxed, as well as its number of
+-- arguments. For instance, (a, b) corresponds to @Boxed 2@, and (# a, b, c #)
+-- corresponds to @Unboxed 3@.
+data TupleSort
+  = Boxed   Int
+#if MIN_VERSION_template_haskell(2,6,0)
+  | Unboxed Int
+#endif
+
+-- "case x of (a1,a2,a3) -> fold [x1 a1, x2 a2, x3 a3]"
+mkSimpleTupleCase :: (Name -> [a] -> Q Match)
+                  -> TupleSort -> [a] -> Exp -> Q Exp
+mkSimpleTupleCase matchForCon tupSort insides x = do
+  let tupDataName = case tupSort of
+                      Boxed   len -> tupleDataName len
+#if MIN_VERSION_template_haskell(2,6,0)
+                      Unboxed len -> unboxedTupleDataName len
+#endif
+  m <- matchForCon tupDataName insides
+  return $ CaseE x [m]

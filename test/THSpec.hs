@@ -73,6 +73,17 @@ data Empty2 a b
 type role Empty2 nominal nominal
 #endif
 
+data TyCon18 a b c = TyCon18 c (TyCon18 a a c)
+
+data TyCon19 a b
+    = TyCon19a (forall c. c -> (forall d. a -> d) -> a)
+    | TyCon19b (Int -> forall c. c -> b)
+
+type family F :: * -> * -> *
+type instance F = Either
+
+data TyCon20 a b = TyCon20 (F a b)
+
 -- Data families
 
 data family   StrangeFam a b c
@@ -116,6 +127,17 @@ data instance ExistentialFam b
 data family   IntFunDFam a b
 data instance IntFunDFam a b = IntFunDFam (IntFun a b)
 
+data family   TyFamily18 x y z
+data instance TyFamily18 a b c = TyFamily18 c (TyFamily18 a a c)
+
+data family   TyFamily19 x y
+data instance TyFamily19 a b
+    = TyFamily19a (forall c. c -> (forall d. a -> d) -> a)
+    | TyFamily19b (Int -> forall c. c -> b)
+
+data family   TyFamily20 x y
+data instance TyFamily20 a b = TyFamily20 (F a b)
+
 -------------------------------------------------------------------------------
 
 -- Plain data types
@@ -152,6 +174,15 @@ $(deriveInvariant2 ''Empty1)
 $(deriveInvariantOptions  defaultOptions{emptyCaseBehavior = True} ''Empty2)
 $(deriveInvariant2Options defaultOptions{emptyCaseBehavior = True} ''Empty2)
 
+$(deriveInvariant  ''TyCon18)
+$(deriveInvariant2 ''TyCon18)
+
+$(deriveInvariant  ''TyCon19)
+$(deriveInvariant2 ''TyCon19)
+
+$(deriveInvariant  ''TyCon20)
+$(deriveInvariant2 ''TyCon20)
+
 #if MIN_VERSION_template_haskell(2,7,0)
 -- Data Families
 
@@ -179,6 +210,15 @@ $(deriveInvariant  'ExistentialListFam)
 
 $(deriveInvariant  'IntFunDFam)
 $(deriveInvariant2 'IntFunDFam)
+
+$(deriveInvariant  'TyFamily18)
+$(deriveInvariant2 'TyFamily18)
+
+$(deriveInvariant  'TyFamily19a)
+$(deriveInvariant2 'TyFamily19a)
+
+$(deriveInvariant  'TyFamily20)
+$(deriveInvariant2 'TyFamily20)
 #endif
 
 -------------------------------------------------------------------------------
