@@ -386,8 +386,8 @@ makeInvmapForCon iClass tvMap
                    , ft_fun    = \g h x -> mkSimpleLam $ \b -> do
                        gg <- g b
                        h $ x `AppE` gg
-                   , ft_tup  = mkSimpleTupleCase match_for_con
-                   , ft_ty_app = \_ contravariant argGs x -> do
+                   , ft_tup    = mkSimpleTupleCase match_for_con
+                   , ft_ty_app = \contravariant argGs x -> do
                        let inspect :: (Type, Exp -> Q Exp, Exp -> Q Exp) -> [Q Exp]
                            inspect (argTy, g, h)
                              -- If the argument type is a bare occurrence of one
@@ -717,11 +717,10 @@ data FFoldType a      -- Describes how to fold over a Type in a functor like way
         , ft_tup     :: TupleSort -> [a] -> a
           -- ^ Tuple type. The [a] is the result of folding over the
           --   arguments of the tuple.
-        , ft_ty_app  :: Type -> Bool -> [(Type, a, a)] -> a
-          -- ^ Type app, variables only in last argument. The Type is the
-          --   function type, and the [(Type, a, a)] are the last argument
-          --   types. That is, they form the function and argument parts of
-          --   @fun_ty arg_ty_1 ... arg_ty_n@, respectively.
+        , ft_ty_app  :: Bool -> [(Type, a, a)] -> a
+          -- ^ Type app, variables only in last argument. The [(Type, a, a)]
+          --   represents the last argument types. That is, they form the
+          --   argument parts of @fun_ty arg_ty_1 ... arg_ty_n@.
           --
           --   The Bool is True if the Type is in a surrounding context that is
           --   contravariant, and False if the surrounding context is covariant.
@@ -799,8 +798,8 @@ functorLikeTraverse iClass tvMap (FT { ft_triv = caseTrivial,     ft_var = caseV
                 if itf -- We can't decompose type families, so
                        -- error if we encounter one here.
                    then wrongArg
-                   else return ( caseTyApp f co $ drop numFirstArgs
-                                                $ zip3 args xrs contraXrs
+                   else return ( caseTyApp co $ drop numFirstArgs
+                                              $ zip3 args xrs contraXrs
                                , True )
     go co (SigT t k) = do
       (_, kc) <- go_kind co k
