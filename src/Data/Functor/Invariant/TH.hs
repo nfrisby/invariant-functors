@@ -41,6 +41,7 @@ import qualified Data.Map as Map ((!), fromList, keys, lookup, member, size)
 import           Data.Maybe
 
 import           Language.Haskell.TH.Datatype
+import           Language.Haskell.TH.Datatype.TyVarBndr
 import           Language.Haskell.TH.Lib
 import           Language.Haskell.TH.Ppr
 import           Language.Haskell.TH.Syntax
@@ -729,7 +730,7 @@ data FFoldType a      -- Describes how to fold over a Type in a functor like way
           --   respectively.
         , ft_bad_app :: a
           -- ^ Type app, variable other than in last arguments
-        , ft_forall  :: [TyVarBndr] -> a -> a
+        , ft_forall  :: [TyVarBndrSpec] -> a -> a
           -- ^ Forall type
      }
 
