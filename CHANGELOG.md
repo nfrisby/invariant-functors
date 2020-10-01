@@ -1,4 +1,4 @@
-# next [????.??.??]
+# 0.5.4 [2020.10.01]
 * Fix a bug in which `deriveInvariant2` would fail on certain data types with
   three or parameters if the first two parameters had phantom roles.
 * Fix a bug in which `deriveInvariant(2)` would fail on sufficiently complex
