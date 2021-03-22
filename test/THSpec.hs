@@ -226,12 +226,12 @@ $(deriveInvariant2 'TyFamily20)
 -- | Verifies that @invmap id id = id@ (the other 'invmap' law follows
 -- as a free theorem:
 -- https://www.fpcomplete.com/user/edwardk/snippets/fmap).
-prop_invmapLaws :: (Eq (f a), Invariant f) => f a -> Bool
-prop_invmapLaws x = invmap id id x == x
+prop_invmapLaws :: (Eq (f a), Show (f a), Invariant f) => f a -> Expectation
+prop_invmapLaws x = invmap id id x `shouldBe` x
 
 -- | Verifies that @invmap2 id id id id = id@.
-prop_invmap2Laws :: (Eq (f a b), Invariant2 f) => f a b -> Bool
-prop_invmap2Laws x = invmap2 id id id id x == x
+prop_invmap2Laws :: (Eq (f a b), Show (f a b), Invariant2 f) => f a b -> Expectation
+prop_invmap2Laws x = invmap2 id id id id x `shouldBe` x
 
 -------------------------------------------------------------------------------
 
@@ -241,10 +241,10 @@ main = hspec spec
 spec :: Spec
 spec = do
     describe "Compose    Maybe Either Int Int" $ do
-        prop "satisfies the invmap laws"  (prop_invmapLaws  :: Compose    Maybe Either Int Int -> Bool)
-        prop "satisfies the invmap2 laws" (prop_invmap2Laws :: Compose    Maybe Either Int Int -> Bool)
+        prop "satisfies the invmap laws"  (prop_invmapLaws  :: Compose    Maybe Either Int Int -> Expectation)
+        prop "satisfies the invmap2 laws" (prop_invmap2Laws :: Compose    Maybe Either Int Int -> Expectation)
 #if MIN_VERSION_template_haskell(2,7,0)
     describe "ComposeFam Maybe Either Int Int" $ do
-        prop "satisfies the invmap laws"  (prop_invmapLaws  :: ComposeFam Maybe Either Int Int -> Bool)
-        prop "satisfies the invmap2 laws" (prop_invmap2Laws :: ComposeFam Maybe Either Int Int -> Bool)
+        prop "satisfies the invmap laws"  (prop_invmapLaws  :: ComposeFam Maybe Either Int Int -> Expectation)
+        prop "satisfies the invmap2 laws" (prop_invmap2Laws :: ComposeFam Maybe Either Int Int -> Expectation)
 #endif
