@@ -866,7 +866,11 @@ mkSimpleConMatch :: (Name -> [a] -> Q Exp)
                  -> Q Match
 mkSimpleConMatch fold conName insides = do
   varsNeeded <- newNameList "_arg" $ length insides
-  let pat = ConP conName (map VarP varsNeeded)
+  let pat = ConP conName
+#if MIN_VERSION_template_haskell(2,18,0)
+                 []
+#endif
+                 (map VarP varsNeeded)
   rhs <- fold conName (zipWith (\i v -> i $ VarE v) insides varsNeeded)
   return $ Match pat (NormalB rhs) []
 

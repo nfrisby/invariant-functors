@@ -1,4 +1,5 @@
 # 0.6 [????.??.??]
+* Allow building with `template-haskell-2.18`.
 * Remove the `Invariant` instance for `Option`, which was removed from
   `Data.Semigroup` in `base-4.16`.
 
