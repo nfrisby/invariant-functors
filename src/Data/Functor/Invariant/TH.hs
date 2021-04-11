@@ -36,7 +36,7 @@ module Data.Functor.Invariant.TH (
 import           Control.Monad (unless, when)
 
 import           Data.Functor.Invariant.TH.Internal
-import           Data.List
+import qualified Data.List as List
 import qualified Data.Map as Map ((!), fromList, keys, lookup, member, size)
 import           Data.Maybe
 
@@ -325,7 +325,7 @@ makeInvmapForCons iClass opts _parentName instTys cons = do
     let mapFuns    = zip covMaps contraMaps
         lastTyVars = map varTToName $ drop (length instTys - numNbs) instTys
         tvMap      = Map.fromList $ zip lastTyVars mapFuns
-        argNames   = concat (transpose [covMaps, contraMaps]) ++ [value]
+        argNames   = concat (List.transpose [covMaps, contraMaps]) ++ [value]
     lamE (map varP argNames)
         . appsE
         $ [ varE $ invmapConstName iClass
@@ -507,7 +507,7 @@ buildTypeInstance iClass tyConName dataCxt varTysOrig variant = do
         --   instance C (Fam [Char])
         remainingTysOrigSubst :: [Type]
         remainingTysOrigSubst =
-          map (substNamesWithKindStar (union droppedKindVarNames kvNames'))
+          map (substNamesWithKindStar (List.union droppedKindVarNames kvNames'))
             $ take remainingLength varTysOrig
 
         isDataFamily :: Bool
