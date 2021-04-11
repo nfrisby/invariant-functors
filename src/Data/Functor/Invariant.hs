@@ -560,9 +560,11 @@ instance Alternative f => Alternative (WrappedFunctor f) where
   many = WrapFunctor . many . unwrapFunctor
 
 instance Monad m => Monad (WrappedFunctor m) where
-  return = WrapFunctor . return
   WrapFunctor x >>= f = WrapFunctor (x >>= unwrapFunctor . f)
+#if !(MIN_VERSION_base(4,11,0))
+  return = WrapFunctor . return
   WrapFunctor a >> WrapFunctor b = WrapFunctor (a >> b)
+#endif
 
 instance MonadPlus m => MonadPlus (WrappedFunctor m) where
   mzero = WrapFunctor mzero
