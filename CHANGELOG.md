@@ -1,8 +1,3 @@
-# 0.6 [????.??.??]
-* Allow building with `template-haskell-2.18`.
-* Remove the `Invariant` instance for `Option`, which was removed from
-  `Data.Semigroup` in `base-4.16`.
-
 # 0.5.4 [2020.10.01]
 * Fix a bug in which `deriveInvariant2` would fail on certain data types with
   three or parameters if the first two parameters had phantom roles.
