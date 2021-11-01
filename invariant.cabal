@@ -53,7 +53,7 @@ library
                      , StateVar             >= 1.1    && < 2
                      , stm                  >= 2.2    && < 3
                      , tagged               >= 0.7.3  && < 1
-                     , template-haskell     >= 2.4    && < 2.18
+                     , template-haskell     >= 2.4    && < 2.19
                      , th-abstraction       >= 0.4    && < 0.5
                      , transformers         >= 0.2    && < 0.6
                      , transformers-compat  >= 0.3    && < 1
@@ -74,7 +74,7 @@ test-suite spec
                      , hspec            >= 1.8
                      , invariant
                      , QuickCheck       >= 2.11 && < 3
-                     , template-haskell >= 2.4  && < 2.18
+                     , template-haskell >= 2.4  && < 2.19
   build-tool-depends:  hspec-discover:hspec-discover
   ghc-options:         -Wall
   if impl(ghc >= 8.6)
