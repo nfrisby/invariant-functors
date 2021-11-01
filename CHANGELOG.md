@@ -1,4 +1,4 @@
-# next [????.??.??]
+# 0.5.5 [2021.11.01]
 * Allow building with GHC 9.2.
 * Allow building with `transformers-0.6.*`.
 
