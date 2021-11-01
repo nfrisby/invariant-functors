@@ -75,7 +75,10 @@ import           Data.Monoid (Alt(..))
 #endif
 import           Data.Monoid (Dual(..), Endo(..))
 import           Data.Proxy (Proxy(..))
-import qualified Data.Semigroup as Semigroup (First(..), Last(..), Option(..))
+import qualified Data.Semigroup as Semigroup (First(..), Last(..))
+#if !(MIN_VERSION_base(4,16,0))
+import qualified Data.Semigroup as Semigroup (Option(..))
+#endif
 import           Data.Semigroup (Min(..), Max(..), Arg(..))
 import qualified Data.Traversable as T (Traversable(..))
 #if GHC_GENERICS_OK
@@ -303,11 +306,13 @@ instance Invariant Semigroup.First where
 instance Invariant Semigroup.Last where
   invmap = invmapFunctor
 -- | from "Data.Semigroup"
-instance Invariant Semigroup.Option where
-  invmap = invmapFunctor
--- | from "Data.Semigroup"
 instance Invariant (Arg a) where
   invmap = invmapFunctor
+#if !(MIN_VERSION_base(4,16,0))
+-- | from "Data.Semigroup"
+instance Invariant Semigroup.Option where
+  invmap = invmapFunctor
+#endif
 
 -- | from "System.Console.GetOpt"
 instance Invariant ArgDescr where

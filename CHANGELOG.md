@@ -1,3 +1,6 @@
+# next [????.??.??]
+* Allow building with GHC 9.2.
+
 # 0.5.4 [2020.10.01]
 * Fix a bug in which `deriveInvariant2` would fail on certain data types with
   three or parameters if the first two parameters had phantom roles.
