@@ -1,5 +1,8 @@
 {-# LANGUAGE CPP #-}
+
+#if !(MIN_VERSION_base(4,16,0)) || !(MIN_VERSION_transformers(0,6,0))
 {-# OPTIONS_GHC -fno-warn-deprecations #-}
+#endif
 
 #define GHC_GENERICS_OK __GLASGOW_HASKELL__ >= 702
 
@@ -146,10 +149,8 @@ import           Data.Tagged (Tagged(..))
 import           Control.Applicative.Backwards (Backwards(..))
 import           Control.Applicative.Lift (Lift(..))
 import           Control.Monad.Trans.Cont (ContT)
-import           Control.Monad.Trans.Error (ErrorT(..))
 import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.Identity (IdentityT, mapIdentityT)
-import           Control.Monad.Trans.List (ListT, mapListT)
 import           Control.Monad.Trans.Maybe (MaybeT, mapMaybeT)
 import qualified Control.Monad.Trans.RWS.Lazy as Lazy (RWST(..))
 import qualified Control.Monad.Trans.RWS.Strict as Strict (RWST(..))
@@ -158,6 +159,10 @@ import qualified Control.Monad.Trans.State.Lazy as Lazy (StateT(..))
 import qualified Control.Monad.Trans.State.Strict as Strict (StateT(..))
 import qualified Control.Monad.Trans.Writer.Lazy as Lazy (WriterT, mapWriterT)
 import qualified Control.Monad.Trans.Writer.Strict as Strict (WriterT, mapWriterT)
+#if !(MIN_VERSION_transformers(0,6,0))
+import           Control.Monad.Trans.Error (ErrorT(..))
+import           Control.Monad.Trans.List (ListT, mapListT)
+#endif
 import           Data.Functor.Constant (Constant(..))
 import           Data.Functor.Reverse (Reverse(..))
 
@@ -477,18 +482,12 @@ instance Invariant f => Invariant (Lift f) where
 -- | from the @transformers@ package
 instance Invariant (ContT r m) where
   invmap = invmapFunctor
--- -- | from the @transformers@ package
-instance Invariant m => Invariant (ErrorT e m) where
-  invmap f g = ErrorT . invmap (invmap f g) (invmap g f) . runErrorT
 -- | from the @transformers@ package
 instance Invariant m => Invariant (ExceptT e m) where
   invmap f g = ExceptT . invmap (invmap f g) (invmap g f) . runExceptT
 -- | from the @transformers@ package
 instance Invariant m => Invariant (IdentityT m) where
   invmap f g = mapIdentityT (invmap f g)
--- | from the @transformers@ package
-instance Invariant m => Invariant (ListT m) where
-  invmap f g = mapListT $ invmap (invmap f g) (invmap g f)
 -- | from the @transformers@ package
 instance Invariant m => Invariant (MaybeT m) where
   invmap f g = mapMaybeT $ invmap (invmap f g) (invmap g f)
@@ -535,6 +534,14 @@ instance Invariant (Constant a) where
 -- | from the @transformers@ package
 instance Invariant f => Invariant (Reverse f) where
   invmap f g (Reverse a) = Reverse (invmap f g a)
+#if !(MIN_VERSION_transformers(0,6,0))
+-- | from the @transformers@ package
+instance Invariant m => Invariant (ErrorT e m) where
+  invmap f g = ErrorT . invmap (invmap f g) (invmap g f) . runErrorT
+-- | from the @transformers@ package
+instance Invariant m => Invariant (ListT m) where
+  invmap f g = mapListT $ invmap (invmap f g) (invmap g f)
+#endif
 
 -- | from the @unordered-containers@ package
 instance Invariant (HashMap k) where
