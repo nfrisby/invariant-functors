@@ -986,3 +986,17 @@ these, you can derive them using the "Data.Functor.Invariant.TH" module.
 genericInvmap :: (Generic1 f, Invariant (Rep1 f)) => (a -> b) -> (b -> a) -> f a -> f b
 genericInvmap f g = to1 . invmap f g . from1
 #endif
+
+-------------------------------------------------------------------------------
+-- Wrappers
+-------------------------------------------------------------------------------
+
+newtype InvariantProfunctor p a = InvariantProfunctor (p a a)
+
+instance Profunctor p => Invariant (InvariantProfunctor p) where
+  invmap fn1 fn2 (InvariantProfunctor f) = InvariantProfunctor (dimap fn2 fn1 f)
+
+newtype InvariantArrow c a = InvariantArrow (c a a)
+
+instance Arrow c => Invariant (InvariantArrow c) where
+  invmap fn1 fn2 (InvariantArrow arrow) = InvariantArrow (arr fn1 Cat.. arrow Cat.. arr fn2)
