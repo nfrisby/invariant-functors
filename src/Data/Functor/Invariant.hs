@@ -42,6 +42,8 @@ module Data.Functor.Invariant
 #endif
   , WrappedFunctor(..)
   , invmapContravariant
+  , invmapProfunctor
+  , invmapArrow
   , WrappedContravariant(..)
   , InvariantProfunctor(..)
   , InvariantArrow(..)
@@ -196,6 +198,14 @@ invmapFunctor = flip $ const fmap
 -- | Every 'Contravariant' functor is also an 'Invariant' functor.
 invmapContravariant :: Contravariant f => (a -> b) -> (b -> a) -> f a -> f b
 invmapContravariant = const contramap
+
+-- | 'Profunctor' with the same input and output args can be seen as an 'Invariant' functor.
+invmapProfunctor :: Profunctor p => (a -> b) -> (b -> a) -> p a a -> p b b
+invmapProfunctor = flip dimap
+
+-- | 'Arrow' with the same input and output args can be seen as an 'Invariant' functor.
+invmapArrow :: Arrow arr => (a -> b) -> (b -> a) -> arr a a -> arr b b
+invmapArrow fn1 fn2 arrow = arr fn1 Cat.. arrow Cat.. arr fn2
 
 -------------------------------------------------------------------------------
 -- Invariant instances
