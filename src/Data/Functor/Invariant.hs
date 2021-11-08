@@ -42,7 +42,11 @@ module Data.Functor.Invariant
 #endif
   , WrappedFunctor(..)
   , invmapContravariant
+  , invmapProfunctor
+  , invmapArrow
   , WrappedContravariant(..)
+  , InvariantProfunctor(..)
+  , InvariantArrow(..)
     -- * @Invariant2@
   , Invariant2(..)
   , invmap2Bifunctor
@@ -194,6 +198,14 @@ invmapFunctor = flip $ const fmap
 -- | Every 'Contravariant' functor is also an 'Invariant' functor.
 invmapContravariant :: Contravariant f => (a -> b) -> (b -> a) -> f a -> f b
 invmapContravariant = const contramap
+
+-- | A 'Profunctor' with the same input and output types can be seen as an 'Invariant' functor.
+invmapProfunctor :: Profunctor p => (a -> b) -> (b -> a) -> p a a -> p b b
+invmapProfunctor = flip dimap
+
+-- | An 'Arrow' with the same input and output types can be seen as an 'Invariant' functor.
+invmapArrow :: Arrow arr => (a -> b) -> (b -> a) -> arr a a -> arr b b
+invmapArrow fn1 fn2 arrow = arr fn1 Cat.. arrow Cat.. arr fn2
 
 -------------------------------------------------------------------------------
 -- Invariant instances
@@ -986,3 +998,19 @@ these, you can derive them using the "Data.Functor.Invariant.TH" module.
 genericInvmap :: (Generic1 f, Invariant (Rep1 f)) => (a -> b) -> (b -> a) -> f a -> f b
 genericInvmap f g = to1 . invmap f g . from1
 #endif
+
+-------------------------------------------------------------------------------
+-- Wrappers
+-------------------------------------------------------------------------------
+
+-- | A 'Profunctor' with the same input and output types can be seen as an 'Invariant' functor.
+newtype InvariantProfunctor p a = InvariantProfunctor (p a a)
+
+instance Profunctor p => Invariant (InvariantProfunctor p) where
+  invmap fn1 fn2 (InvariantProfunctor f) = InvariantProfunctor (dimap fn2 fn1 f)
+
+-- | An 'Arrow' with the same input and output types can be seen as an 'Invariant' functor.
+newtype InvariantArrow c a = InvariantArrow (c a a)
+
+instance Arrow c => Invariant (InvariantArrow c) where
+  invmap fn1 fn2 (InvariantArrow arrow) = InvariantArrow (arr fn1 Cat.. arrow Cat.. arr fn2)
