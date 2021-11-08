@@ -43,6 +43,8 @@ module Data.Functor.Invariant
   , WrappedFunctor(..)
   , invmapContravariant
   , WrappedContravariant(..)
+  , InvariantProfunctor(..)
+  , InvariantArrow(..)
     -- * @Invariant2@
   , Invariant2(..)
   , invmap2Bifunctor
