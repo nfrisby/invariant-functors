@@ -203,7 +203,7 @@ invmapContravariant = const contramap
 invmapProfunctor :: Profunctor p => (a -> b) -> (b -> a) -> p a a -> p b b
 invmapProfunctor = flip dimap
 
--- | 'Arrow' with the same input and output args can be seen as an 'Invariant' functor.
+-- | An 'Arrow' with the same input and output types can be seen as an 'Invariant' functor.
 invmapArrow :: Arrow arr => (a -> b) -> (b -> a) -> arr a a -> arr b b
 invmapArrow fn1 fn2 arrow = arr fn1 Cat.. arrow Cat.. arr fn2
 
