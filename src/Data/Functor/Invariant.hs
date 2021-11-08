@@ -199,7 +199,7 @@ invmapFunctor = flip $ const fmap
 invmapContravariant :: Contravariant f => (a -> b) -> (b -> a) -> f a -> f b
 invmapContravariant = const contramap
 
--- | 'Profunctor' with the same input and output args can be seen as an 'Invariant' functor.
+-- | A 'Profunctor' with the same input and output types can be seen as an 'Invariant' functor.
 invmapProfunctor :: Profunctor p => (a -> b) -> (b -> a) -> p a a -> p b b
 invmapProfunctor = flip dimap
 
