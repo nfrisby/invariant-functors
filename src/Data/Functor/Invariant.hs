@@ -1007,10 +1007,10 @@ genericInvmap f g = to1 . invmap f g . from1
 newtype InvariantProfunctor p a = InvariantProfunctor (p a a)
 
 instance Profunctor p => Invariant (InvariantProfunctor p) where
-  invmap fn1 fn2 (InvariantProfunctor f) = InvariantProfunctor (dimap fn2 fn1 f)
+  invmap fn1 fn2 (InvariantProfunctor f) = InvariantProfunctor (invmapProfunctor fn1 fn2 f)
 
 -- | An 'Arrow' with the same input and output types can be seen as an 'Invariant' functor.
 newtype InvariantArrow c a = InvariantArrow (c a a)
 
 instance Arrow c => Invariant (InvariantArrow c) where
-  invmap fn1 fn2 (InvariantArrow arrow) = InvariantArrow (arr fn1 Cat.. arrow Cat.. arr fn2)
+  invmap fn1 fn2 (InvariantArrow arrow) = InvariantArrow (invmapArrow fn1 fn2 arrow)
