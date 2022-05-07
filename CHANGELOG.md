@@ -1,4 +1,4 @@
-# next [????.??.??]
+# 0.5.6 [2022.05.07]
 * Add `InvariantProfunctor` and `InvariantArrow` newtypes that admit
   implementations of `invmap` that only require `Profunctor` or `Arrow`
   constraints, respectively. Also add top-level `invmapProfunctor` and
