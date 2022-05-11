@@ -436,6 +436,9 @@ instance Invariant (Forget r a) where
 instance Invariant2 p => Invariant (Closure p a) where
   invmap = invmap2 id id
 -- | from the @profunctors@ package
+instance Invariant (Environment p a) where
+  invmap = invmap2 id id
+-- | from the @profunctors@ package
 instance Invariant2 p => Invariant (Codensity p a) where
   invmap = invmap2 id id
 -- | from the @profunctors@ package
@@ -457,8 +460,26 @@ instance Invariant2 q => Invariant (Ran p q a) where
 instance Invariant2 p => Invariant (Tambara p a) where
   invmap = invmap2 id id
 -- | from the @profunctors@ package
+instance Invariant (PastroSum p a) where
+  invmap = invmap2 id id
+-- | from the @profunctors@ package
+instance Invariant (FreeMapping p a) where
+  invmap = invmap2 id id
+-- | from the @profunctors@ package
+instance Invariant (FreeTraversing p a) where
+  invmap = invmap2 id id
+-- | from the @profunctors@ package
+instance Invariant (Pastro p a) where
+  invmap = invmap2 id id
+-- | from the @profunctors@ package
 instance Invariant (Cotambara p a) where
   invmap = invmapFunctor
+-- | from the @profunctors@ package
+instance Invariant (Copastro p a) where
+  invmap = invmap2 id id
+-- | from the @profunctors@ package
+instance Invariant (CopastroSum p a) where
+  invmap = invmap2 id id
 -- | from the @profunctors@ package
 instance Invariant (CotambaraSum p a) where
   invmap = invmapFunctor
@@ -468,6 +489,9 @@ instance Invariant2 p => Invariant (TambaraSum p a) where
 -- | from the @profunctors@ package
 instance Invariant (Yoneda p a) where
   invmap = invmapFunctor
+-- | from the @profunctors@ package
+instance Invariant (Coyoneda p a) where
+  invmap = invmap2 id id
 
 -- | from the @StateVar@ package
 instance Invariant StateVar where
@@ -809,6 +833,9 @@ instance Invariant2 (Pastro p) where
 instance Invariant2 (Cotambara p) where
   invmap2 = invmap2Profunctor
 -- | from the @profunctors@ package
+instance Invariant2 (Copastro p) where
+  invmap2 = invmap2Profunctor
+-- | from the @profunctors@ package
 instance Invariant2 (CopastroSum p) where
   invmap2 = invmap2Profunctor
 -- | from the @profunctors@ package
@@ -820,6 +847,9 @@ instance Invariant2 p => Invariant2 (TambaraSum p) where
     TambaraSum (invmap2 (first f) (first f') (first g) (first g') p)
 -- | from the @profunctors@ package
 instance Invariant2 (Yoneda p) where
+  invmap2 = invmap2Profunctor
+-- | from the @profunctors@ package
+instance Invariant2 (Coyoneda p) where
   invmap2 = invmap2Profunctor
 
 -- | from the @tagged@ package
