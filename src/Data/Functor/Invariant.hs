@@ -112,7 +112,7 @@ import           Data.Bifunctor.Tannen
 import           Data.Bifunctor.Wrapped
 
 -- comonad
-import           Control.Comonad (Comonad(..), Cokleisli(..), liftW)
+import           Control.Comonad (Cokleisli(..))
 
 -- containers
 import           Data.IntMap (IntMap)
@@ -739,9 +739,8 @@ instance Bifunctor p => Invariant2 (WrappedBifunctor p) where
   invmap2 = invmap2Bifunctor
 
 -- | from the @comonad@ package
-instance Comonad w => Invariant2 (Cokleisli w) where
-   invmap2 _ f' g _ (Cokleisli w) = Cokleisli $ g . w . liftW f'
-
+instance Invariant w => Invariant2 (Cokleisli w) where
+   invmap2 f f' g _ (Cokleisli w) = Cokleisli $ g . w . invmap f' f
 -- | from the @contravariant@ package
 instance Invariant2 Op where
   invmap2 f f' g g' (Op x) = Op $ invmap2 g g' f f' x
