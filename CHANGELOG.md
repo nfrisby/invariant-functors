@@ -3,6 +3,10 @@
   `Kleisli` to an `Invariant` constraint.
 * Loosen the `Comonad` constraint in the `Invariant2` instance for `Cokleisli`
   to an `Invariant` constraint.
+* Add `Invariant` instances for `PastroSum`, `CopastroSum`, `Environment`,
+  `FreeMapping`, `Pastro`, and `FreeTraversing` from the `profunctors` library.
+* Add `Invariant(2)` instances for `Copastro` and `Coyoneda` from the
+  `profunctors` library.
 
 # 0.5.6 [2022.05.07]
 * Add `InvariantProfunctor` and `InvariantArrow` newtypes that admit
