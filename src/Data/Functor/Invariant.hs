@@ -702,8 +702,8 @@ instance Arrow arr => Invariant2 (App.WrappedArrow arr) where
   invmap2 _ f' g _ (App.WrapArrow x) = App.WrapArrow $ arr g Cat.. x Cat.. arr f'
 
 -- | from "Control.Arrow"
-instance Monad m => Invariant2 (Kleisli m) where
-  invmap2 _ f' g _ (Kleisli m) = Kleisli $ liftM g . m . f'
+instance Invariant m => Invariant2 (Kleisli m) where
+  invmap2 _ f' g g' (Kleisli m) = Kleisli $ invmap g g' . m . f'
 
 -- | from "Data.Semigroup"
 instance Invariant2 Arg where
