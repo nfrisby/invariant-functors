@@ -247,8 +247,8 @@ instance
   => Invariant (ArrowMonad a) where
   invmap f _ (ArrowMonad m) = ArrowMonad (m >>> arr f)
 -- | from "Control.Arrow"
-instance Monad m => Invariant (Kleisli m a) where
-  invmap = invmap2 id id
+instance Invariant m => Invariant (Kleisli m a) where
+  invmap f g (Kleisli m) = Kleisli (invmap f g . m)
 
 -- | from "Control.Exception"
 instance Invariant Handler where
