@@ -1,4 +1,4 @@
-# 0.6 [????.??.??]
+# 0.6 [2022.07.03]
 * Loosen the `Monad` constraint in the `Invariant(2)` instances for
   `Kleisli` to an `Invariant` constraint.
 * Loosen the `Comonad` constraint in the `Invariant2` instance for `Cokleisli`
