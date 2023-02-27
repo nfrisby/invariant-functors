@@ -1,3 +1,6 @@
+# next [????.??.??]
+* Support `th-abstraction-0.5.*`.
+
 # 0.6 [2022.07.03]
 * Loosen the `Monad` constraint in the `Invariant(2)` instances for
   `Kleisli` to an `Invariant` constraint.
