@@ -1,3 +1,10 @@
+# next [????.??.??]
+* The Template Haskell machinery now uses `TemplateHaskellQuotes` when
+  building with GHC 8.0+ instead of manually constructing each Template Haskell
+  `Name`. A consequence of this is that `invariant` will now build with GHC
+  9.8, as `TemplateHaskellQuotes` abstracts over some internal Template Haskell
+  changes introduced in 9.8.
+
 # 0.6.1 [2023.02.27]
 * Support `th-abstraction-0.5.*`.
 
