@@ -1,5 +1,9 @@
 {-# LANGUAGE CPP #-}
 
+#if __GLASGOW_HASKELL__ >= 800
+{-# LANGUAGE TemplateHaskellQuotes #-}
+#endif
+
 {-|
 Module:      Data.Functor.Invariant.TH.Internal
 Copyright:   (C) 2012-2017 Nicolas Frisby, (C) 2015-2017 Ryan Scott
@@ -24,9 +28,14 @@ import           Language.Haskell.TH.Datatype
 import           Language.Haskell.TH.Lib
 import           Language.Haskell.TH.Syntax
 
-#ifndef CURRENT_PACKAGE_KEY
+#if __GLASGOW_HASKELL__ >= 800
+import           Data.Coerce (coerce)
+import           Data.Functor.Invariant (Invariant(..), Invariant2(..))
+#else
+# ifndef CURRENT_PACKAGE_KEY
 import           Data.Version (showVersion)
 import           Paths_invariant (version)
+# endif
 #endif
 
 -------------------------------------------------------------------------------
@@ -384,19 +393,52 @@ uncurryKind k              = [k]
 #endif
 
 -------------------------------------------------------------------------------
--- Manually quoted names
+-- Quoted names
 -------------------------------------------------------------------------------
 
+#if __GLASGOW_HASKELL__ >= 800
+-- With GHC 8.0 or later, we can simply use TemplateHaskellQuotes to quote each
+-- name. Life is good.
+
+invariantTypeName :: Name
+invariantTypeName = ''Invariant
+
+invariant2TypeName :: Name
+invariant2TypeName = ''Invariant2
+
+invmapValName :: Name
+invmapValName = 'invmap
+
+invmap2ValName :: Name
+invmap2ValName = 'invmap2
+
+invmapConstValName :: Name
+invmapConstValName = 'invmapConst
+
+invmap2ConstValName :: Name
+invmap2ConstValName = 'invmap2Const
+
+coerceValName :: Name
+coerceValName = 'coerce
+
+errorValName :: Name
+errorValName = 'error
+
+seqValName :: Name
+seqValName = 'seq
+#else
+-- On pre-8.0 GHCs, we do not have access to the TemplateHaskellQuotes
+-- extension, so we construct the Template Haskell names by hand.
 -- By manually generating these names we avoid needing to use the
 -- TemplateHaskell language extension when compiling the invariant library.
 -- This allows the library to be used in stage1 cross-compilers.
 
 invariantPackageKey :: String
-#ifdef CURRENT_PACKAGE_KEY
+# ifdef CURRENT_PACKAGE_KEY
 invariantPackageKey = CURRENT_PACKAGE_KEY
-#else
+# else
 invariantPackageKey = "invariant-" ++ showVersion version
-#endif
+# endif
 
 mkInvariantName_tc :: String -> String -> Name
 mkInvariantName_tc = mkNameG_tc invariantPackageKey
@@ -430,3 +472,4 @@ errorValName = mkNameG_v "base" "GHC.Err" "error"
 
 seqValName :: Name
 seqValName = mkNameG_v "ghc-prim" "GHC.Prim" "seq"
+#endif
