@@ -1,4 +1,4 @@
-# next [????.??.??]
+# 0.6.2 [2023.08.06]
 * The Template Haskell machinery now uses `TemplateHaskellQuotes` when
   building with GHC 8.0+ instead of manually constructing each Template Haskell
   `Name`. A consequence of this is that `invariant` will now build with GHC
