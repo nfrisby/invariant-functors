@@ -265,6 +265,9 @@ jobs:
           cat >> cabal.project <<EOF
           package invariant
             ghc-options: -Werror
+
+          if impl ( ghc >= 9.10 )
+            constraints: hashable +os-string
           EOF
           if $HEADHACKAGE; then
           echo "allow-newer: $($HCPKG list --simple-output | sed -E 's/([a-zA-Z-]+)-[0-9.]+/*:\1,/g')" >> cabal.project
