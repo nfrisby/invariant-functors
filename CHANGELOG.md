@@ -1,4 +1,4 @@
-# next [????.??.??]
+# 0.6.3 [2024.03.19]
 * Support building with `template-haskell-2.22.*` (GHC 9.10).
 
 # 0.6.2 [2023.08.06]
