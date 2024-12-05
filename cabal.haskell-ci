@@ -1,14 +1,4 @@
-distribution:           bionic
+distribution:           jammy
 no-tests-no-benchmarks: False
 unconstrained:          False
-allow-failures:         <7.3
 local-ghc-options:      -Werror
--- Work around https://github.com/haskell/haddock/issues/242
-haddock:                <7.6 || >=7.8
-
-raw-project
-  -- TODO: Remove this once we no longer depend on haskell-ci's head.hackage
-  -- integration, which needlessly forces --allow-newer=filepath (see
-  -- https://gitlab.haskell.org/ghc/head.hackage/-/issues/100)
-  if impl(ghc >= 9.10)
-    constraints: hashable +os-string

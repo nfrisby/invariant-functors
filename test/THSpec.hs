@@ -1,22 +1,18 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-#if __GLASGOW_HASKELL__ >= 708
-{-# LANGUAGE EmptyCase #-}
-{-# LANGUAGE RoleAnnotations #-}
-#endif
 
-{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
-{-# OPTIONS_GHC -fno-warn-unused-matches #-}
-#if __GLASGOW_HASKELL__ >= 800
-{-# OPTIONS_GHC -fno-warn-unused-foralls #-}
-#endif
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
+{-# OPTIONS_GHC -Wno-unused-foralls #-}
 module THSpec (main, spec) where
 
 import Data.Functor.Invariant
@@ -69,9 +65,7 @@ data IntFunD a b = IntFunD (IntFun a b)
 
 data Empty1 a b
 data Empty2 a b
-#if __GLASGOW_HASKELL__ >= 708
 type role Empty2 nominal nominal
-#endif
 
 data TyCon18 a b c = TyCon18 c (TyCon18 a a c)
 
@@ -183,7 +177,6 @@ $(deriveInvariant2 ''TyCon19)
 $(deriveInvariant  ''TyCon20)
 $(deriveInvariant2 ''TyCon20)
 
-#if MIN_VERSION_template_haskell(2,7,0)
 -- Data Families
 
 $(deriveInvariant  'T1Fam)
@@ -219,7 +212,6 @@ $(deriveInvariant2 'TyFamily19a)
 
 $(deriveInvariant  'TyFamily20)
 $(deriveInvariant2 'TyFamily20)
-#endif
 
 -------------------------------------------------------------------------------
 
@@ -243,8 +235,6 @@ spec = do
     describe "Compose    Maybe Either Int Int" $ do
         prop "satisfies the invmap laws"  (prop_invmapLaws  :: Compose    Maybe Either Int Int -> Expectation)
         prop "satisfies the invmap2 laws" (prop_invmap2Laws :: Compose    Maybe Either Int Int -> Expectation)
-#if MIN_VERSION_template_haskell(2,7,0)
     describe "ComposeFam Maybe Either Int Int" $ do
         prop "satisfies the invmap laws"  (prop_invmapLaws  :: ComposeFam Maybe Either Int Int -> Expectation)
         prop "satisfies the invmap2 laws" (prop_invmap2Laws :: ComposeFam Maybe Either Int Int -> Expectation)
-#endif

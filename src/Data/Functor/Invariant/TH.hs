@@ -337,20 +337,14 @@ makeInvmapForCons iClass opts _parentName instTys cons = do
 
     makeFun :: Name -> TyVarMap -> Q Exp
     makeFun value tvMap = do
-#if MIN_VERSION_template_haskell(2,9,0)
       roles <- reifyRoles _parentName
       let rroles = roles
-#endif
       case () of
-        _
-
-#if MIN_VERSION_template_haskell(2,9,0)
-          | (length rroles >= numNbs) &&
+        _ | (length rroles >= numNbs) &&
             (all (== PhantomR) (drop (length rroles - numNbs) rroles))
          -> varE coerceValName `appE` varE value
-#endif
 
-          | null cons && emptyCaseBehavior opts && ghc7'8OrLater
+          | null cons && emptyCaseBehavior opts
          -> caseE (varE value) []
 
           | null cons
@@ -361,13 +355,6 @@ makeInvmapForCons iClass opts _parentName instTys cons = do
           | otherwise
          -> caseE (varE value)
                   (map (makeInvmapForCon iClass tvMap) cons)
-
-    ghc7'8OrLater :: Bool
-#if __GLASGOW_HASKELL__ >= 708
-    ghc7'8OrLater = True
-#else
-    ghc7'8OrLater = False
-#endif
 
 -- | Generates a match for invmap(2) for a single constructor.
 makeInvmapForCon :: InvariantClass -> TyVarMap -> ConstructorInfo -> Q Match
@@ -512,13 +499,11 @@ buildTypeInstance iClass tyConName dataCxt varTysOrig variant = do
 
     isDataFamily <-
       case variant of
-        Datatype        -> return False
-        Newtype         -> return False
-        DataInstance    -> return True
-        NewtypeInstance -> return True
-#if MIN_VERSION_th_abstraction(0,5,0)
+        Datatype          -> return False
+        Newtype           -> return False
+        DataInstance      -> return True
+        NewtypeInstance   -> return True
         Datatype.TypeData -> typeDataError tyConName
-#endif
 
     let remainingTysOrigSubst' :: [Type]
         -- See Note [Kind signatures in derived instances] for an explanation
@@ -703,7 +688,6 @@ etaReductionError instanceType = fail $
     "Cannot eta-reduce to an instance of form \n\tinstance (...) => "
     ++ pprint instanceType
 
-#if MIN_VERSION_th_abstraction(0,5,0)
 -- | We cannot implement class methods at the term level for @type data@
 -- declarations, which only exist at the type level.
 typeDataError :: Name -> Q a
@@ -712,7 +696,6 @@ typeDataError dataName = fail
   . showString (nameBase dataName)
   . showString "‘, which is a ‘type data‘ declaration"
   $ ""
-#endif
 
 -------------------------------------------------------------------------------
 -- Generic traversal for functor-like deriving
@@ -802,10 +785,8 @@ functorLikeTraverse iClass tvMap (FT { ft_triv = caseTrivial,     ft_var = caseV
           -- and at least one xr is True
           |  TupleT len <- f
           -> tuple $ Boxed len
-#if MIN_VERSION_template_haskell(2,6,0)
           |  UnboxedTupleT len <- f
           -> tuple $ Unboxed len
-#endif
           |  fc || or (take numFirstArgs xcs)
           -> wrongArg                    -- T (..var..)    ty_1 ... ty_n
           |  otherwise                   -- T (..no var..) ty_1 ... ty_n
@@ -817,7 +798,7 @@ functorLikeTraverse iClass tvMap (FT { ft_triv = caseTrivial,     ft_var = caseV
                                               $ zip3 args xrs contraXrs
                                , True )
     go co (SigT t k) = do
-      (_, kc) <- go_kind co k
+      (_, kc) <- go co k
       if kc
          then return (caseWrongArg, True)
          else go co t
@@ -833,17 +814,6 @@ functorLikeTraverse iClass tvMap (FT { ft_triv = caseTrivial,     ft_var = caseV
          then trivial
          else return (caseForAll tvbs tr, True)
     go _ _ = trivial
-
-    {-
-    go_kind :: Bool
-            -> Kind
-            -> Q (a, Bool)
-    -}
-#if MIN_VERSION_template_haskell(2,9,0)
-    go_kind = go
-#else
-    go_kind _ _ = trivial
-#endif
 
     -- trivial :: Q (a, Bool)
     trivial = return (caseTrivial, False)
@@ -892,9 +862,7 @@ mkSimpleConMatch fold conName insides = do
 -- corresponds to @Unboxed 3@.
 data TupleSort
   = Boxed   Int
-#if MIN_VERSION_template_haskell(2,6,0)
   | Unboxed Int
-#endif
 
 -- "case x of (a1,a2,a3) -> fold [x1 a1, x2 a2, x3 a3]"
 mkSimpleTupleCase :: (Name -> [a] -> Q Match)
@@ -902,8 +870,6 @@ mkSimpleTupleCase :: (Name -> [a] -> Q Match)
 mkSimpleTupleCase matchForCon tupSort insides x = do
   let tupDataName = case tupSort of
                       Boxed   len -> tupleDataName len
-#if MIN_VERSION_template_haskell(2,6,0)
                       Unboxed len -> unboxedTupleDataName len
-#endif
   m <- matchForCon tupDataName insides
   return $ CaseE x [m]

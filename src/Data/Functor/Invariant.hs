@@ -1,21 +1,14 @@
 {-# LANGUAGE CPP #-}
 
 #if !(MIN_VERSION_base(4,16,0)) || !(MIN_VERSION_transformers(0,6,0))
-{-# OPTIONS_GHC -fno-warn-deprecations #-}
+{-# OPTIONS_GHC -Wno-deprecations #-}
 #endif
 
-#define GHC_GENERICS_OK __GLASGOW_HASKELL__ >= 702
-
-#if GHC_GENERICS_OK
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeFamilies #-}
-#endif
-
-#if __GLASGOW_HASKELL__ >= 706
 {-# LANGUAGE PolyKinds #-}
-#endif
+{-# LANGUAGE TypeFamilies #-}
 
 {-|
 Module:      Data.Functor.Invariant
@@ -35,11 +28,9 @@ module Data.Functor.Invariant
   ( -- * @Invariant@
     Invariant(..)
   , invmapFunctor
-#if GHC_GENERICS_OK
     -- ** @GHC.Generics@
     -- $ghcgenerics
   , genericInvmap
-#endif
   , WrappedFunctor(..)
   , invmapContravariant
   , invmapProfunctor
@@ -64,22 +55,15 @@ import           Control.Exception (Handler(..))
 import           Control.Monad (MonadPlus(..), liftM)
 import qualified Control.Monad.ST as Strict (ST)
 import qualified Control.Monad.ST.Lazy as Lazy (ST)
-#if MIN_VERSION_base(4,4,0)
 import           Data.Complex (Complex(..))
-#endif
 import qualified Data.Foldable as F (Foldable(..))
 import qualified Data.Functor.Compose as Functor (Compose(..))
 import           Data.Functor.Identity (Identity)
 import           Data.Functor.Product as Functor (Product(..))
 import           Data.Functor.Sum as Functor (Sum(..))
-#if __GLASGOW_HASKELL__ < 711
-import           Data.Ix (Ix)
-#endif
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Monoid as Monoid (First(..), Last(..), Product(..), Sum(..))
-#if MIN_VERSION_base(4,8,0)
 import           Data.Monoid (Alt(..))
-#endif
 import           Data.Monoid (Dual(..), Endo(..))
 import           Data.Proxy (Proxy(..))
 import qualified Data.Semigroup as Semigroup (First(..), Last(..))
@@ -88,9 +72,7 @@ import qualified Data.Semigroup as Semigroup (Option(..))
 #endif
 import           Data.Semigroup (Min(..), Max(..), Arg(..))
 import qualified Data.Traversable as T (Traversable(..))
-#if GHC_GENERICS_OK
 import           GHC.Generics
-#endif
 import           System.Console.GetOpt as GetOpt
 import           Text.ParserCombinators.ReadP (ReadP)
 import           Text.ParserCombinators.ReadPrec (ReadPrec)
@@ -186,10 +168,8 @@ import           Data.HashMap.Lazy (HashMap)
 -- > invmap f2 f2' . invmap f1 f1' = invmap (f2 . f1) (f1' . f2')
 class Invariant f where
   invmap :: (a -> b) -> (b -> a) -> f a -> f b
-#if GHC_GENERICS_OK
   default invmap :: (Generic1 f, Invariant (Rep1 f)) => (a -> b) -> (b -> a) -> f a -> f b
   invmap = genericInvmap
-#endif
 
 -- | Every 'Functor' is also an 'Invariant' functor.
 invmapFunctor :: Functor f => (a -> b) -> (b -> a) -> f a -> f b
@@ -238,13 +218,7 @@ instance Arrow arr => Invariant (App.WrappedArrow arr a) where
   invmap f _ (App.WrapArrow x) = App.WrapArrow $ ((arr f) Cat.. x)
 
 -- | from "Control.Arrow"
-instance
-#if MIN_VERSION_base(4,4,0)
-  Arrow a
-#else
-  ArrowApply a
-#endif
-  => Invariant (ArrowMonad a) where
+instance Arrow a => Invariant (ArrowMonad a) where
   invmap f _ (ArrowMonad m) = ArrowMonad (m >>> arr f)
 -- | from "Control.Arrow"
 instance Invariant m => Invariant (Kleisli m a) where
@@ -254,11 +228,9 @@ instance Invariant m => Invariant (Kleisli m a) where
 instance Invariant Handler where
   invmap f _ (Handler h) = Handler (fmap f . h)
 
-#if MIN_VERSION_base(4,4,0)
 -- | from "Data.Complex"
 instance Invariant Complex where
   invmap f _ (r :+ i) = f r :+ f i
-#endif
 
 -- | from "Data.Functor.Compose"
 instance (Invariant f, Invariant g) => Invariant (Functor.Compose f g) where
@@ -300,11 +272,9 @@ instance Invariant Monoid.Product where
 -- | from "Data.Monoid"
 instance Invariant Monoid.Sum where
   invmap f _ (Monoid.Sum x) = Monoid.Sum (f x)
-#if MIN_VERSION_base(4,8,0)
 -- | from "Data.Monoid"
 instance Invariant f => Invariant (Alt f) where
   invmap f g (Alt x) = Alt (invmap f g x)
-#endif
 
 -- | from "Data.Proxy"
 instance Invariant Proxy where
@@ -346,11 +316,7 @@ instance Invariant OptDescr where
   invmap f g (GetOpt.Option a b argDescr c) = GetOpt.Option a b (invmap f g argDescr) c
 
 -- | from the @array@ package
-instance
-#if __GLASGOW_HASKELL__ < 711
-  Ix i =>
-#endif
-    Invariant (Array i) where
+instance Invariant (Array i) where
   invmap = invmapFunctor
 
 -- | from the @bifunctors@ package
@@ -628,11 +594,8 @@ instance F.Foldable f => F.Foldable (WrappedFunctor f) where
   foldl f q  = F.foldl f q  . unwrapFunctor
   foldr1 f   = F.foldr1 f   . unwrapFunctor
   foldl1 f   = F.foldl1 f   . unwrapFunctor
-#if MIN_VERSION_base(4,6,0)
   foldr' f z = F.foldr' f z . unwrapFunctor
   foldl' f q = F.foldl' f q . unwrapFunctor
-#endif
-#if MIN_VERSION_base(4,8,0)
   toList     = F.toList     . unwrapFunctor
   null       = F.null       . unwrapFunctor
   length     = F.length     . unwrapFunctor
@@ -641,7 +604,6 @@ instance F.Foldable f => F.Foldable (WrappedFunctor f) where
   minimum    = F.minimum    . unwrapFunctor
   sum        = F.sum        . unwrapFunctor
   product    = F.product    . unwrapFunctor
-#endif
 #if MIN_VERSION_base(4,13,0)
   foldMap' f = F.foldMap' f . unwrapFunctor
 #endif
@@ -944,7 +906,6 @@ instance ProfunctorComonad WrappedProfunctor where
   proextract   = unwrapProfunctor
   produplicate = WrapProfunctor
 
-#if GHC_GENERICS_OK
 -------------------------------------------------------------------------------
 -- GHC Generics
 -------------------------------------------------------------------------------
@@ -976,7 +937,6 @@ instance Invariant f => Invariant (Rec1 f) where invmap f g (Rec1 fp) = Rec1 $ i
 instance (Invariant f, Invariant g) => Invariant ((:.:) f g) where
   invmap f g (Comp1 fgp) = Comp1 $ invmap (invmap f g) (invmap g f) fgp
 
-# if __GLASGOW_HASKELL__ >= 800
 -- | from "GHC.Generics"
 instance Invariant UAddr where
   invmap _ _ (UAddr a) = UAddr a
@@ -1000,7 +960,6 @@ instance Invariant UInt where
 -- | from "GHC.Generics"
 instance Invariant UWord where
   invmap _ _ (UWord w) = UWord w
-# endif
 
 {- $ghcgenerics
 With GHC 7.2 or later, 'Invariant' instances can be defined easily using GHC
@@ -1026,7 +985,6 @@ these, you can derive them using the "Data.Functor.Invariant.TH" module.
 -- | A generic implementation of 'invmap'.
 genericInvmap :: (Generic1 f, Invariant (Rep1 f)) => (a -> b) -> (b -> a) -> f a -> f b
 genericInvmap f g = to1 . invmap f g . from1
-#endif
 
 -------------------------------------------------------------------------------
 -- Wrappers

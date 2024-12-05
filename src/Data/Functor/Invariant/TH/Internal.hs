@@ -1,8 +1,5 @@
 {-# LANGUAGE CPP #-}
-
-#if __GLASGOW_HASKELL__ >= 800
 {-# LANGUAGE TemplateHaskellQuotes #-}
-#endif
 
 {-|
 Module:      Data.Functor.Invariant.TH.Internal
@@ -15,8 +12,9 @@ Template Haskell-related utilities.
 -}
 module Data.Functor.Invariant.TH.Internal where
 
+import           Data.Coerce (coerce)
 import           Data.Foldable (foldr')
-import           Data.Functor.Invariant () -- To import the instances
+import           Data.Functor.Invariant (Invariant(..), Invariant2(..))
 import qualified Data.List as List
 import qualified Data.Map as Map (singleton)
 import           Data.Map (Map)
@@ -28,26 +26,12 @@ import           Language.Haskell.TH.Datatype
 import           Language.Haskell.TH.Lib
 import           Language.Haskell.TH.Syntax
 
-#if __GLASGOW_HASKELL__ >= 800
-import           Data.Coerce (coerce)
-import           Data.Functor.Invariant (Invariant(..), Invariant2(..))
-#else
-# ifndef CURRENT_PACKAGE_KEY
-import           Data.Version (showVersion)
-import           Paths_invariant (version)
-# endif
-#endif
-
 -------------------------------------------------------------------------------
 -- Expanding type synonyms
 -------------------------------------------------------------------------------
 
 applySubstitutionKind :: Map Name Kind -> Type -> Type
-#if MIN_VERSION_template_haskell(2,8,0)
 applySubstitutionKind = applySubstitution
-#else
-applySubstitutionKind _ t = t
-#endif
 
 substNameWithKind :: Name -> Kind -> Type -> Type
 substNameWithKind n k = applySubstitutionKind (Map.singleton n k)
@@ -114,9 +98,7 @@ canRealizeKindStar :: Type -> StarKindStatus
 canRealizeKindStar t
   | hasKindStar t = KindStar
   | otherwise = case t of
-#if MIN_VERSION_template_haskell(2,8,0)
                      SigT _ (VarT k) -> IsKindVar k
-#endif
                      _               -> NotKindStar
 
 -- | Returns 'Just' the kind variable 'Name' of a 'StarKindStatus' if it exists.
@@ -137,21 +119,13 @@ catKindVarNames = mapMaybe starKindStatusToName
 -- | Returns True if a Type has kind *.
 hasKindStar :: Type -> Bool
 hasKindStar VarT{}         = True
-#if MIN_VERSION_template_haskell(2,8,0)
 hasKindStar (SigT _ StarT) = True
-#else
-hasKindStar (SigT _ StarK) = True
-#endif
 hasKindStar _              = False
 
 -- Returns True is a kind is equal to *, or if it is a kind variable.
 isStarOrVar :: Kind -> Bool
-#if MIN_VERSION_template_haskell(2,8,0)
 isStarOrVar StarT  = True
 isStarOrVar VarT{} = True
-#else
-isStarOrVar StarK  = True
-#endif
 isStarOrVar _      = False
 
 -- | @hasKindVarChain n kind@ Checks if @kind@ is of the form
@@ -205,11 +179,7 @@ createKindChain = go starK
 
 -- | Applies a typeclass constraint to a type.
 applyClass :: Name -> Name -> Pred
-#if MIN_VERSION_template_haskell(2,10,0)
 applyClass con t = AppT (ConT con) (VarT t)
-#else
-applyClass con t = ClassP con [VarT t]
-#endif
 
 -- | Checks to see if the last types in a data family instance can be safely eta-
 -- reduced (i.e., dropped), given the other types. This checks for three conditions:
@@ -270,25 +240,10 @@ isInTypeFamilyApp names tyFun tyArgs =
     go tcName = do
       info <- reify tcName
       case info of
-#if MIN_VERSION_template_haskell(2,11,0)
         FamilyI (OpenTypeFamilyD (TypeFamilyHead _ bndrs _ _)) _
           -> withinFirstArgs bndrs
-#elif MIN_VERSION_template_haskell(2,7,0)
-        FamilyI (FamilyD TypeFam _ bndrs _) _
-          -> withinFirstArgs bndrs
-#else
-        TyConI (FamilyD TypeFam _ bndrs _)
-          -> withinFirstArgs bndrs
-#endif
-
-#if MIN_VERSION_template_haskell(2,11,0)
         FamilyI (ClosedTypeFamilyD (TypeFamilyHead _ bndrs _ _) _) _
           -> withinFirstArgs bndrs
-#elif MIN_VERSION_template_haskell(2,9,0)
-        FamilyI (ClosedTypeFamilyD _ bndrs _ _) _
-          -> withinFirstArgs bndrs
-#endif
-
         _ -> return False
       where
         withinFirstArgs :: [a] -> Q Bool
@@ -315,21 +270,13 @@ mentionsName = go
   where
     go :: Type -> [Name] -> Bool
     go (AppT t1 t2) names = go t1 names || go t2 names
-    go (SigT t _k)  names = go t names
-#if MIN_VERSION_template_haskell(2,8,0)
-                              || go _k names
-#endif
+    go (SigT t k)   names = go t names || go k names
     go (VarT n)     names = n `elem` names
     go _            _     = False
 
 -- | Does an instance predicate mention any of the Names in the list?
 predMentionsName :: Pred -> [Name] -> Bool
-#if MIN_VERSION_template_haskell(2,10,0)
 predMentionsName = mentionsName
-#else
-predMentionsName (ClassP n tys) names = n `elem` names || any (`mentionsName` names) tys
-predMentionsName (EqualP t1 t2) names = mentionsName t1 names || mentionsName t2 names
-#endif
 
 -- | Construct a type via curried application.
 applyTy :: Type -> [Type] -> Type
@@ -356,10 +303,8 @@ unapplyTy ty = go ty ty []
     go :: Type -> Type -> [Type] -> (Type, [Type])
     go _      (AppT ty1 ty2)     args = go ty1 ty1 (ty2:args)
     go origTy (SigT ty' _)       args = go origTy ty' args
-#if MIN_VERSION_template_haskell(2,11,0)
     go origTy (InfixT ty1 n ty2) args = go origTy (ConT n `AppT` ty1 `AppT` ty2) args
     go origTy (ParensT ty')      args = go origTy ty' args
-#endif
     go origTy _                  args = (origTy, args)
 
 -- | Split a type signature by the arrows on its spine. For example, this:
@@ -385,20 +330,11 @@ uncurryTy t = ([], [t])
 
 -- | Like uncurryType, except on a kind level.
 uncurryKind :: Kind -> [Kind]
-#if MIN_VERSION_template_haskell(2,8,0)
 uncurryKind = snd . uncurryTy
-#else
-uncurryKind (ArrowK k1 k2) = k1:uncurryKind k2
-uncurryKind k              = [k]
-#endif
 
 -------------------------------------------------------------------------------
 -- Quoted names
 -------------------------------------------------------------------------------
-
-#if __GLASGOW_HASKELL__ >= 800
--- With GHC 8.0 or later, we can simply use TemplateHaskellQuotes to quote each
--- name. Life is good.
 
 invariantTypeName :: Name
 invariantTypeName = ''Invariant
@@ -426,50 +362,3 @@ errorValName = 'error
 
 seqValName :: Name
 seqValName = 'seq
-#else
--- On pre-8.0 GHCs, we do not have access to the TemplateHaskellQuotes
--- extension, so we construct the Template Haskell names by hand.
--- By manually generating these names we avoid needing to use the
--- TemplateHaskell language extension when compiling the invariant library.
--- This allows the library to be used in stage1 cross-compilers.
-
-invariantPackageKey :: String
-# ifdef CURRENT_PACKAGE_KEY
-invariantPackageKey = CURRENT_PACKAGE_KEY
-# else
-invariantPackageKey = "invariant-" ++ showVersion version
-# endif
-
-mkInvariantName_tc :: String -> String -> Name
-mkInvariantName_tc = mkNameG_tc invariantPackageKey
-
-mkInvariantName_v :: String -> String -> Name
-mkInvariantName_v = mkNameG_v invariantPackageKey
-
-invariantTypeName :: Name
-invariantTypeName = mkInvariantName_tc "Data.Functor.Invariant" "Invariant"
-
-invariant2TypeName :: Name
-invariant2TypeName = mkInvariantName_tc "Data.Functor.Invariant" "Invariant2"
-
-invmapValName :: Name
-invmapValName = mkInvariantName_v "Data.Functor.Invariant" "invmap"
-
-invmap2ValName :: Name
-invmap2ValName = mkInvariantName_v "Data.Functor.Invariant" "invmap2"
-
-invmapConstValName :: Name
-invmapConstValName = mkInvariantName_v "Data.Functor.Invariant.TH.Internal" "invmapConst"
-
-invmap2ConstValName :: Name
-invmap2ConstValName = mkInvariantName_v "Data.Functor.Invariant.TH.Internal" "invmap2Const"
-
-coerceValName :: Name
-coerceValName = mkNameG_v "ghc-prim" "GHC.Prim" "coerce"
-
-errorValName :: Name
-errorValName = mkNameG_v "base" "GHC.Err" "error"
-
-seqValName :: Name
-seqValName = mkNameG_v "ghc-prim" "GHC.Prim" "seq"
-#endif
