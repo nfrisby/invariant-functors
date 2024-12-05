@@ -28,6 +28,7 @@ tested-with:         GHC == 8.0.2
                    , GHC == 9.6.6
                    , GHC == 9.8.4
                    , GHC == 9.10.1
+                   , GHC == 9.12.1
 extra-source-files:  CHANGELOG.md, README.md
 
 source-repository head
@@ -52,7 +53,7 @@ library
                      , StateVar             >= 1.1    && < 2
                      , stm                  >= 2.2    && < 3
                      , tagged               >= 0.7.3  && < 1
-                     , template-haskell     >= 2.11   && < 2.23
+                     , template-haskell     >= 2.11   && < 2.24
                      , th-abstraction       >= 0.5    && < 0.8
                      , transformers         >= 0.2    && < 0.7
                      , transformers-compat  >= 0.3    && < 1
